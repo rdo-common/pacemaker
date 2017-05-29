@@ -154,8 +154,8 @@ Url:           http://www.clusterlabs.org
 Group:         System Environment/Daemons
 
 # eg. https://github.com/ClusterLabs/pacemaker/archive/8ae45302394b039fb098e150f156df29fc0cb576/pacemaker-8ae4530.tar.gz
-Source0:       https://github.com/%{github_owner}/%{name}/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
-Source1:       nagios-agents-metadata-%{nagios_hash}.tar.gz
+Source0:       http://people.redhat.com/mbaldess/rpms/container-repo/sources/pacemaker/%{name}-%{shortcommit}.tar.gz
+Source1:       http://people.redhat.com/mbaldess/rpms/container-repo/sources/pacemaker/nagios-agents-metadata-%{nagios_hash}.tar.gz
 
 # upstream commits
 Patch1:         001-crm_report-log-search.patch
