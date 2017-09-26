@@ -1,0 +1,1160 @@
+From fc69905f116e41a724fdde160c83111d22ae8b2e Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Tue, 25 Jul 2017 09:24:57 +1000
+Subject: [PATCH 3/6] Log: PE: Ignore optional unfencing events and report the
+ fencing type
+
+---
+ pengine/allocate.c                                   | 10 +++++++---
+ pengine/test10/594.summary                           |  2 +-
+ pengine/test10/829.summary                           |  2 +-
+ pengine/test10/bug-5186-partial-migrate.summary      |  2 +-
+ pengine/test10/bug-cl-5247.summary                   |  2 +-
+ pengine/test10/bug-lf-2508.summary                   |  2 +-
+ pengine/test10/bug-lf-2551.summary                   |  2 +-
+ pengine/test10/bug-lf-2606.summary                   |  2 +-
+ pengine/test10/bug-rh-1097457.summary                |  2 +-
+ pengine/test10/concurrent-fencing.summary            |  6 +++---
+ pengine/test10/guest-node-host-dies.summary          |  6 +++---
+ pengine/test10/interleave-pseudo-stop.summary        |  2 +-
+ pengine/test10/master-7.summary                      |  2 +-
+ pengine/test10/master-8.summary                      |  2 +-
+ pengine/test10/migrate-fencing.summary               |  2 +-
+ pengine/test10/per-op-failcount.summary              |  2 +-
+ pengine/test10/rec-node-11.summary                   |  2 +-
+ pengine/test10/rec-node-12.summary                   |  2 +-
+ pengine/test10/rec-node-13.summary                   |  2 +-
+ pengine/test10/rec-node-14.summary                   |  6 +++---
+ pengine/test10/rec-node-15.summary                   |  2 +-
+ pengine/test10/rec-node-2.summary                    |  2 +-
+ pengine/test10/rec-node-4.summary                    |  2 +-
+ pengine/test10/rec-node-6.summary                    |  2 +-
+ pengine/test10/rec-node-7.summary                    |  2 +-
+ pengine/test10/rec-rsc-5.summary                     |  2 +-
+ pengine/test10/remote-fence-before-reconnect.summary |  2 +-
+ pengine/test10/remote-fence-unclean-3.summary        |  2 +-
+ pengine/test10/remote-fence-unclean.summary          |  2 +-
+ pengine/test10/remote-fence-unclean2.summary         |  2 +-
+ pengine/test10/remote-partial-migrate2.summary       |  2 +-
+ pengine/test10/remote-recover-all.summary            |  6 +++---
+ pengine/test10/remote-recover-connection.summary     |  2 +-
+ pengine/test10/remote-recover-fail.summary           |  2 +-
+ pengine/test10/remote-recover-no-resources.summary   |  4 ++--
+ pengine/test10/remote-recover-unknown.summary        |  6 +++---
+ pengine/test10/remote-recovery.summary               |  2 +-
+ pengine/test10/remote-unclean2.summary               |  2 +-
+ pengine/test10/start-then-stop-with-unfence.summary  |  3 +--
+ pengine/test10/stonith-0.summary                     |  4 ++--
+ pengine/test10/stonith-1.summary                     |  2 +-
+ pengine/test10/stonith-2.summary                     |  2 +-
+ pengine/test10/stonith-3.summary                     |  2 +-
+ pengine/test10/stonith-4.summary                     |  8 ++++----
+ pengine/test10/stop-failure-no-quorum.summary        |  2 +-
+ pengine/test10/stop-failure-with-fencing.summary     |  2 +-
+ pengine/test10/systemhealth1.summary                 |  4 ++--
+ pengine/test10/systemhealth2.summary                 |  2 +-
+ pengine/test10/systemhealth3.summary                 |  2 +-
+ pengine/test10/systemhealthm1.summary                |  4 ++--
+ pengine/test10/systemhealthm2.summary                |  2 +-
+ pengine/test10/systemhealthm3.summary                |  2 +-
+ pengine/test10/systemhealthn1.summary                |  4 ++--
+ pengine/test10/systemhealthn2.summary                |  2 +-
+ pengine/test10/systemhealthn3.summary                |  2 +-
+ pengine/test10/systemhealtho1.summary                |  4 ++--
+ pengine/test10/systemhealtho2.summary                |  2 +-
+ pengine/test10/systemhealtho3.summary                |  2 +-
+ pengine/test10/systemhealthp1.summary                |  4 ++--
+ pengine/test10/systemhealthp2.summary                |  2 +-
+ pengine/test10/systemhealthp3.summary                |  2 +-
+ pengine/test10/ticket-clone-21.summary               |  4 ++--
+ pengine/test10/ticket-clone-9.summary                |  4 ++--
+ pengine/test10/ticket-group-21.summary               |  2 +-
+ pengine/test10/ticket-group-9.summary                |  2 +-
+ pengine/test10/ticket-master-21.summary              |  2 +-
+ pengine/test10/ticket-master-9.summary               |  2 +-
+ pengine/test10/ticket-primitive-21.summary           |  2 +-
+ pengine/test10/ticket-primitive-9.summary            |  2 +-
+ pengine/test10/unfence-definition.summary            |  8 +++-----
+ pengine/test10/unfence-parameters.summary            |  9 ++++-----
+ pengine/test10/unfence-startup.summary               |  7 ++-----
+ pengine/test10/whitebox-fail1.summary                |  2 +-
+ pengine/test10/whitebox-fail2.summary                |  2 +-
+ pengine/test10/whitebox-imply-stop-on-fence.summary  |  6 +++---
+ pengine/test10/whitebox-ms-ordering.summary          |  4 ++--
+ pengine/test10/whitebox-unexpectedly-running.summary |  2 +-
+ 77 files changed, 114 insertions(+), 117 deletions(-)
+
+diff --git a/pengine/allocate.c b/pengine/allocate.c
+index 3a883ad..8ea2ea1 100644
+--- a/pengine/allocate.c
++++ b/pengine/allocate.c
+@@ -2419,11 +2419,13 @@ LogNodeActions(pe_working_set_t * data_set, gboolean terminal)
+ 
+     for (gIter = data_set->actions; gIter != NULL; gIter = gIter->next) {
+         char *node_name = NULL;
+-        const char *task = NULL;
++        char *task = NULL;
+         action_t *action = (action_t *) gIter->data;
+ 
+         if (action->rsc != NULL) {
+             continue;
++        } else if (is_set(action->flags, pe_action_optional)) {
++            continue;
+         }
+ 
+         if (is_container_remote_node(action->node)) {
+@@ -2433,9 +2435,10 @@ LogNodeActions(pe_working_set_t * data_set, gboolean terminal)
+         }
+ 
+         if (safe_str_eq(action->task, CRM_OP_SHUTDOWN)) {
+-            task = "Shutdown";
++            task = strdup("Shutdown");
+         } else if (safe_str_eq(action->task, CRM_OP_FENCE)) {
+-            task = "Fence";
++            const char *op = g_hash_table_lookup(action->meta, "stonith_action");
++            task = crm_strdup_printf("Fence (%s)", op);
+         }
+ 
+         if(task == NULL) {
+@@ -2447,6 +2450,7 @@ LogNodeActions(pe_working_set_t * data_set, gboolean terminal)
+         }
+ 
+         free(node_name);
++        free(task);
+     }
+ }
+ 
+diff --git a/pengine/test10/594.summary b/pengine/test10/594.summary
+index d9fe8c1..ef2a02c 100644
+--- a/pengine/test10/594.summary
++++ b/pengine/test10/594.summary
+@@ -13,7 +13,7 @@ Online: [ hadev1 hadev2 ]
+      child_DoFencing:2	(stonith:ssh):	Started hadev1
+ 
+ Transition Summary:
+- * Fence hadev3
++ * Fence (reboot) hadev3
+  * Shutdown hadev2
+  * Move    DcIPaddr	(Started hadev2 -> hadev1)
+  * Move    rsc_hadev2	(Started hadev2 -> hadev1)
+diff --git a/pengine/test10/829.summary b/pengine/test10/829.summary
+index a9d25e0..556699f 100644
+--- a/pengine/test10/829.summary
++++ b/pengine/test10/829.summary
+@@ -15,7 +15,7 @@ Online: [ c001n01 c001n03 c001n08 ]
+      child_DoFencing:3	(stonith:ssh):	Started c001n08
+ 
+ Transition Summary:
+- * Fence c001n02
++ * Fence (reboot) c001n02
+  * Move    rsc_c001n02	(Started c001n02 -> c001n01)
+  * Stop    child_DoFencing:0	(c001n02)
+ 
+diff --git a/pengine/test10/bug-5186-partial-migrate.summary b/pengine/test10/bug-5186-partial-migrate.summary
+index 63ed2d7..a32e81d 100644
+--- a/pengine/test10/bug-5186-partial-migrate.summary
++++ b/pengine/test10/bug-5186-partial-migrate.summary
+@@ -25,7 +25,7 @@ Online: [ bl460g1n6 bl460g1n8 ]
+      Started: [ bl460g1n6 bl460g1n8 ]
+ 
+ Transition Summary:
+- * Fence bl460g1n7
++ * Fence (reboot) bl460g1n7
+  * Move    prmDummy	(Started bl460g1n7 -> bl460g1n6)
+  * Move    prmVM2	(Started bl460g1n7 -> bl460g1n8)
+  * Move    prmStonith8-1	(Started bl460g1n7 -> bl460g1n6)
+diff --git a/pengine/test10/bug-cl-5247.summary b/pengine/test10/bug-cl-5247.summary
+index 8ea3ff0..f70a9ea 100644
+--- a/pengine/test10/bug-cl-5247.summary
++++ b/pengine/test10/bug-cl-5247.summary
+@@ -18,7 +18,7 @@ Containers: [ pgsr01:prmDB1 ]
+      Stopped: [ bl460g8n3 bl460g8n4 ]
+ 
+ Transition Summary:
+- * Fence pgsr02 (resource: prmDB2)
++ * Fence (off) pgsr02 (resource: prmDB2)
+  * Stop    prmDB2	(bl460g8n4)
+  * Restart prmStonith1-2	(Started bl460g8n4)
+  * Restart prmStonith2-2	(Started bl460g8n3)
+diff --git a/pengine/test10/bug-lf-2508.summary b/pengine/test10/bug-lf-2508.summary
+index 7b436d4..7931d19 100644
+--- a/pengine/test10/bug-lf-2508.summary
++++ b/pengine/test10/bug-lf-2508.summary
+@@ -35,7 +35,7 @@ Online: [ srv01 srv03 srv04 ]
+      Stopped: [ srv04 ]
+ 
+ Transition Summary:
+- * Fence srv02
++ * Fence (reboot) srv02
+  * Start   Dummy01	(srv01)
+  * Move    Dummy02	(Started srv02 -> srv04)
+  * Stop    prmStonith1-1:1	(srv02)
+diff --git a/pengine/test10/bug-lf-2551.summary b/pengine/test10/bug-lf-2551.summary
+index ffb7c6d..ef2e54a 100644
+--- a/pengine/test10/bug-lf-2551.summary
++++ b/pengine/test10/bug-lf-2551.summary
+@@ -81,7 +81,7 @@ Online: [ hex-0 hex-7 hex-8 ]
+  vm-64	(ocf::heartbeat:Xen):	Stopped 
+ 
+ Transition Summary:
+- * Fence hex-9
++ * Fence (reboot) hex-9
+  * Move    fencing-sbd	(Started hex-9 -> hex-0)
+  * Move    dummy1	(Started hex-9 -> hex-0)
+  * Stop    dlm:3	(hex-9)
+diff --git a/pengine/test10/bug-lf-2606.summary b/pengine/test10/bug-lf-2606.summary
+index ab93bb3..f30a053 100644
+--- a/pengine/test10/bug-lf-2606.summary
++++ b/pengine/test10/bug-lf-2606.summary
+@@ -12,7 +12,7 @@ Online: [ node1 ]
+      Slaves: [ node1 ]
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+  * Move    rsc2	(Started node2 -> node1)
+  * Demote  rsc3:1	(Master -> Stopped node2)
+diff --git a/pengine/test10/bug-rh-1097457.summary b/pengine/test10/bug-rh-1097457.summary
+index 8fe474a..1c355c0 100644
+--- a/pengine/test10/bug-rh-1097457.summary
++++ b/pengine/test10/bug-rh-1097457.summary
+@@ -32,7 +32,7 @@ Containers: [ lamaVM1:VM1 lamaVM2:VM2 lamaVM3:VM3 ]
+      Started: [ lamaVM1 lamaVM2 lamaVM3 ]
+ 
+ Transition Summary:
+- * Fence lamaVM2 (resource: VM2)
++ * Fence (reboot) lamaVM2 (resource: VM2)
+  * Recover VM2	(Started lama3)
+  * Recover FSlun3	(Started lamaVM2 -> lama2)
+  * Restart FAKE4	(Started lamaVM2)
+diff --git a/pengine/test10/concurrent-fencing.summary b/pengine/test10/concurrent-fencing.summary
+index a274c3b..1e4a817 100644
+--- a/pengine/test10/concurrent-fencing.summary
++++ b/pengine/test10/concurrent-fencing.summary
+@@ -8,9 +8,9 @@ Node node3 (uuid3): UNCLEAN (offline)
+  lsb_dummy	(lsb:/usr/lib/heartbeat/cts/LSBDummy):	Stopped
+ 
+ Transition Summary:
+- * Fence node3
+- * Fence node2
+- * Fence node1
++ * Fence (reboot) node3
++ * Fence (reboot) node2
++ * Fence (reboot) node1
+ 
+ Executing cluster transition:
+  * Fencing node3 (reboot)
+diff --git a/pengine/test10/guest-node-host-dies.summary b/pengine/test10/guest-node-host-dies.summary
+index 717c43d..9f85613 100644
+--- a/pengine/test10/guest-node-host-dies.summary
++++ b/pengine/test10/guest-node-host-dies.summary
+@@ -11,9 +11,9 @@ Online: [ rhel7-2 rhel7-3 rhel7-4 rhel7-5 ]
+      Stopped: [ rhel7-1 rhel7-2 rhel7-3 rhel7-4 rhel7-5 ]
+ 
+ Transition Summary:
+- * Fence rhel7-1
+- * Fence lxc2 (resource: container2)
+- * Fence lxc1 (resource: container1)
++ * Fence (reboot) rhel7-1
++ * Fence (reboot) lxc2 (resource: container2)
++ * Fence (reboot) lxc1 (resource: container1)
+  * Restart Fencing	(Started rhel7-4)
+  * Move    rsc_rhel7-1	(Started rhel7-1 -> rhel7-5)
+  * Recover container1	(Started rhel7-1 -> rhel7-2)
+diff --git a/pengine/test10/interleave-pseudo-stop.summary b/pengine/test10/interleave-pseudo-stop.summary
+index cf30da0..12be956 100644
+--- a/pengine/test10/interleave-pseudo-stop.summary
++++ b/pengine/test10/interleave-pseudo-stop.summary
+@@ -17,7 +17,7 @@ Online: [ node2 ]
+      Started: [ node2 ]
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Stop    stonithclone:1	(node1)
+  * Stop    evmsclone:1	(node1)
+  * Stop    imagestoreclone:1	(node1)
+diff --git a/pengine/test10/master-7.summary b/pengine/test10/master-7.summary
+index 348b4ee..2889efb 100644
+--- a/pengine/test10/master-7.summary
++++ b/pengine/test10/master-7.summary
+@@ -29,7 +29,7 @@ Online: [ c001n02 c001n03 c001n08 ]
+      ocf_msdummy:7	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n08 
+ 
+ Transition Summary:
+- * Fence c001n01
++ * Fence (reboot) c001n01
+  * Move    DcIPaddr	(Started c001n01 -> c001n03)
+  * Move    ocf_192.168.100.181	(Started c001n03 -> c001n02)
+  * Move    heartbeat_192.168.100.182	(Started c001n03 -> c001n02)
+diff --git a/pengine/test10/master-8.summary b/pengine/test10/master-8.summary
+index b77c884..5968a25 100644
+--- a/pengine/test10/master-8.summary
++++ b/pengine/test10/master-8.summary
+@@ -29,7 +29,7 @@ Online: [ c001n02 c001n03 c001n08 ]
+      ocf_msdummy:7	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n08 
+ 
+ Transition Summary:
+- * Fence c001n01
++ * Fence (reboot) c001n01
+  * Move    DcIPaddr	(Started c001n01 -> c001n03)
+  * Move    ocf_192.168.100.181	(Started c001n03 -> c001n02)
+  * Move    heartbeat_192.168.100.182	(Started c001n03 -> c001n02)
+diff --git a/pengine/test10/migrate-fencing.summary b/pengine/test10/migrate-fencing.summary
+index 831e49a..842c65d 100644
+--- a/pengine/test10/migrate-fencing.summary
++++ b/pengine/test10/migrate-fencing.summary
+@@ -22,7 +22,7 @@ Online: [ pcmk-1 pcmk-2 pcmk-3 ]
+      Slaves: [ pcmk-1 pcmk-2 pcmk-3 ]
+ 
+ Transition Summary:
+- * Fence pcmk-4
++ * Fence (reboot) pcmk-4
+  * Stop    FencingChild:0	(pcmk-4)
+  * Move    r192.168.101.181	(Started pcmk-4 -> pcmk-1)
+  * Move    r192.168.101.182	(Started pcmk-4 -> pcmk-1)
+diff --git a/pengine/test10/rec-node-11.summary b/pengine/test10/rec-node-11.summary
+index eb967dd..22f5af7 100644
+--- a/pengine/test10/rec-node-11.summary
++++ b/pengine/test10/rec-node-11.summary
+@@ -10,7 +10,7 @@ Online: [ node2 ]
+  rsc3	(heartbeat:apache):	Started node2
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+  * Move    rsc1	(Started node1 -> node2)
+  * Move    rsc2	(Started node1 -> node2)
+diff --git a/pengine/test10/rec-node-12.summary b/pengine/test10/rec-node-12.summary
+index 26f9b13..6316fdb 100644
+--- a/pengine/test10/rec-node-12.summary
++++ b/pengine/test10/rec-node-12.summary
+@@ -15,7 +15,7 @@ Online: [ c001n01 c001n03 c001n08 ]
+      child_DoFencing:3	(stonith:ssh):	Stopped 
+ 
+ Transition Summary:
+- * Fence c001n02
++ * Fence (reboot) c001n02
+  * Start   DcIPaddr	(c001n08)
+  * Start   rsc_c001n08	(c001n08)
+  * Start   rsc_c001n02	(c001n01)
+diff --git a/pengine/test10/rec-node-13.summary b/pengine/test10/rec-node-13.summary
+index e273a79..c222ad8 100644
+--- a/pengine/test10/rec-node-13.summary
++++ b/pengine/test10/rec-node-13.summary
+@@ -34,7 +34,7 @@ OFFLINE: [ c001n03 c001n05 ]
+      ocf_msdummy:11	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n07 
+ 
+ Transition Summary:
+- * Fence c001n04
++ * Fence (reboot) c001n04
+  * Stop    ocf_msdummy:6	(c001n04)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/rec-node-14.summary b/pengine/test10/rec-node-14.summary
+index 532f3d9..f503a92 100644
+--- a/pengine/test10/rec-node-14.summary
++++ b/pengine/test10/rec-node-14.summary
+@@ -8,9 +8,9 @@ Node node3 (uuid3): UNCLEAN (offline)
+  lsb_dummy	(lsb:/usr/lib/heartbeat/cts/LSBDummy):	Stopped 
+ 
+ Transition Summary:
+- * Fence node3
+- * Fence node2
+- * Fence node1
++ * Fence (reboot) node3
++ * Fence (reboot) node2
++ * Fence (reboot) node1
+ 
+ Executing cluster transition:
+  * Fencing node1 (reboot)
+diff --git a/pengine/test10/rec-node-15.summary b/pengine/test10/rec-node-15.summary
+index 8d88680..2f706d2 100644
+--- a/pengine/test10/rec-node-15.summary
++++ b/pengine/test10/rec-node-15.summary
+@@ -21,7 +21,7 @@ Online: [ sapcl01 ]
+      oralsnr_25	(ocf::heartbeat:oralsnr):	Stopped 
+ 
+ Transition Summary:
+- * Fence sapcl03
++ * Fence (reboot) sapcl03
+  * Start   stonith-1	(sapcl01)
+  * Move    IPaddr_192_168_1_102	(Started sapcl02 -> sapcl01)
+  * Move    LVM_12	(Started sapcl02 -> sapcl01)
+diff --git a/pengine/test10/rec-node-2.summary b/pengine/test10/rec-node-2.summary
+index 5c8db02..0e0183f 100644
+--- a/pengine/test10/rec-node-2.summary
++++ b/pengine/test10/rec-node-2.summary
+@@ -14,7 +14,7 @@ Online: [ node2 ]
+      rsc6	(heartbeat:apache):	Stopped 
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+  * Start   rsc1	(node2)
+  * Start   rsc2	(node2)
+diff --git a/pengine/test10/rec-node-4.summary b/pengine/test10/rec-node-4.summary
+index 761573f..0a2606e 100644
+--- a/pengine/test10/rec-node-4.summary
++++ b/pengine/test10/rec-node-4.summary
+@@ -8,7 +8,7 @@ Online: [ node2 ]
+  rsc2	(heartbeat:apache):	Started node1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+  * Move    rsc1	(Started node1 -> node2)
+  * Move    rsc2	(Started node1 -> node2)
+diff --git a/pengine/test10/rec-node-6.summary b/pengine/test10/rec-node-6.summary
+index fb294fb..530c7d2 100644
+--- a/pengine/test10/rec-node-6.summary
++++ b/pengine/test10/rec-node-6.summary
+@@ -8,7 +8,7 @@ Online: [ node2 ]
+  rsc2	(heartbeat:apache):	Started node1
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+  * Move    rsc1	(Started node1 -> node2)
+  * Move    rsc2	(Started node1 -> node2)
+diff --git a/pengine/test10/rec-node-7.summary b/pengine/test10/rec-node-7.summary
+index 761573f..0a2606e 100644
+--- a/pengine/test10/rec-node-7.summary
++++ b/pengine/test10/rec-node-7.summary
+@@ -8,7 +8,7 @@ Online: [ node2 ]
+  rsc2	(heartbeat:apache):	Started node1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+  * Move    rsc1	(Started node1 -> node2)
+  * Move    rsc2	(Started node1 -> node2)
+diff --git a/pengine/test10/rec-rsc-5.summary b/pengine/test10/rec-rsc-5.summary
+index 7bcb1a3..c3e658a 100644
+--- a/pengine/test10/rec-rsc-5.summary
++++ b/pengine/test10/rec-rsc-5.summary
+@@ -8,7 +8,7 @@ Online: [ node1 ]
+  rsc2	(heartbeat:apache):	Started node2
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Start   stonith-1	(node1)
+  * Recover rsc1	(Started node2 -> node1)
+  * Move    rsc2	(Started node2 -> node1)
+diff --git a/pengine/test10/remote-fence-before-reconnect.summary b/pengine/test10/remote-fence-before-reconnect.summary
+index 520f5cf..2ce3315 100644
+--- a/pengine/test10/remote-fence-before-reconnect.summary
++++ b/pengine/test10/remote-fence-before-reconnect.summary
+@@ -12,7 +12,7 @@ Online: [ c7auto1 c7auto2 c7auto3 ]
+  fake5	(ocf::heartbeat:Dummy):	Started c7auto3
+ 
+ Transition Summary:
+- * Fence c7auto4
++ * Fence (reboot) c7auto4
+  * Stop    c7auto4	(c7auto1)
+  * Move    fake2	(Started c7auto4 -> c7auto1)
+ 
+diff --git a/pengine/test10/remote-fence-unclean.summary b/pengine/test10/remote-fence-unclean.summary
+index 06940fc..667549b 100644
+--- a/pengine/test10/remote-fence-unclean.summary
++++ b/pengine/test10/remote-fence-unclean.summary
+@@ -11,7 +11,7 @@ Online: [ 18builder 18node1 18node2 ]
+  FAKE4	(ocf::heartbeat:Dummy):	Started 18node1 
+ 
+ Transition Summary:
+- * Fence remote1
++ * Fence (reboot) remote1
+  * Recover remote1	(Started 18node1)
+  * Move    FAKE2	(Started remote1 -> 18builder)
+  * Move    FAKE3	(Started 18builder -> 18node1)
+diff --git a/pengine/test10/remote-fence-unclean2.summary b/pengine/test10/remote-fence-unclean2.summary
+index 96f5d69..0844c29 100644
+--- a/pengine/test10/remote-fence-unclean2.summary
++++ b/pengine/test10/remote-fence-unclean2.summary
+@@ -10,7 +10,7 @@ OFFLINE: [ rhel7-alt3 ]
+  fake	(ocf::heartbeat:Dummy):	Started rhel7-alt4 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence rhel7-alt4
++ * Fence (reboot) rhel7-alt4
+  * Stop    fake	(rhel7-alt4)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/remote-partial-migrate2.summary b/pengine/test10/remote-partial-migrate2.summary
+index 197bd8c..b8b9b4c 100644
+--- a/pengine/test10/remote-partial-migrate2.summary
++++ b/pengine/test10/remote-partial-migrate2.summary
+@@ -63,7 +63,7 @@ RemoteOFFLINE: [ pcmk_remote4 ]
+  FAKE50	(ocf::heartbeat:Dummy):	Started pcmk_remote5 
+ 
+ Transition Summary:
+- * Fence pcmk4
++ * Fence (reboot) pcmk4
+  * Migrate pcmk_remote2	(Started pcmk3 -> pcmk1)
+  * Start   pcmk_remote4	(pcmk2)
+  * Migrate pcmk_remote5	(Started pcmk1 -> pcmk2)
+diff --git a/pengine/test10/remote-recover-all.summary b/pengine/test10/remote-recover-all.summary
+index 3f29f70..5e4f51d 100644
+--- a/pengine/test10/remote-recover-all.summary
++++ b/pengine/test10/remote-recover-all.summary
+@@ -38,9 +38,9 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence messaging-1
+- * Fence galera-2
+- * Fence controller-1
++ * Fence (reboot) messaging-1
++ * Fence (reboot) galera-2
++ * Fence (reboot) controller-1
+  * Stop    messaging-1	(controller-1)
+  * Move    galera-0	(Started controller-1 -> controller-2)
+  * Stop    galera-2	(controller-1)
+diff --git a/pengine/test10/remote-recover-connection.summary b/pengine/test10/remote-recover-connection.summary
+index 43507af..79ea7da 100644
+--- a/pengine/test10/remote-recover-connection.summary
++++ b/pengine/test10/remote-recover-connection.summary
+@@ -38,7 +38,7 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence controller-1
++ * Fence (reboot) controller-1
+  * Move    messaging-1	(Started controller-1 -> controller-2)
+  * Move    galera-0	(Started controller-1 -> controller-2)
+  * Move    galera-2	(Started controller-1 -> controller-2)
+diff --git a/pengine/test10/remote-recover-fail.summary b/pengine/test10/remote-recover-fail.summary
+index ec2d701..313c8ac 100644
+--- a/pengine/test10/remote-recover-fail.summary
++++ b/pengine/test10/remote-recover-fail.summary
+@@ -14,7 +14,7 @@ OFFLINE: [ rhel7-auto1 ]
+  FAKE6	(ocf::heartbeat:Dummy):	Started rhel7-auto4 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence rhel7-auto4
++ * Fence (reboot) rhel7-auto4
+  * Recover rhel7-auto4	(Started rhel7-auto2)
+  * Start   FAKE1	(rhel7-auto2)
+  * Move    FAKE2	(Started rhel7-auto4 -> rhel7-auto3)
+diff --git a/pengine/test10/remote-recover-no-resources.summary b/pengine/test10/remote-recover-no-resources.summary
+index 48355a4..bd27773 100644
+--- a/pengine/test10/remote-recover-no-resources.summary
++++ b/pengine/test10/remote-recover-no-resources.summary
+@@ -38,8 +38,8 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence messaging-1
+- * Fence controller-1
++ * Fence (reboot) messaging-1
++ * Fence (reboot) controller-1
+  * Stop    messaging-1	(controller-1)
+  * Move    galera-0	(Started controller-1 -> controller-2)
+  * Stop    galera-2	(controller-1)
+diff --git a/pengine/test10/remote-recover-unknown.summary b/pengine/test10/remote-recover-unknown.summary
+index 212af4e..8a3d560 100644
+--- a/pengine/test10/remote-recover-unknown.summary
++++ b/pengine/test10/remote-recover-unknown.summary
+@@ -38,9 +38,9 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence messaging-1
+- * Fence galera-2
+- * Fence controller-1
++ * Fence (reboot) messaging-1
++ * Fence (reboot) galera-2
++ * Fence (reboot) controller-1
+  * Stop    messaging-1	(controller-1)
+  * Move    galera-0	(Started controller-1 -> controller-2)
+  * Stop    galera-2	(controller-1)
+diff --git a/pengine/test10/remote-recovery.summary b/pengine/test10/remote-recovery.summary
+index 43507af..79ea7da 100644
+--- a/pengine/test10/remote-recovery.summary
++++ b/pengine/test10/remote-recovery.summary
+@@ -38,7 +38,7 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
+ Transition Summary:
+- * Fence controller-1
++ * Fence (reboot) controller-1
+  * Move    messaging-1	(Started controller-1 -> controller-2)
+  * Move    galera-0	(Started controller-1 -> controller-2)
+  * Move    galera-2	(Started controller-1 -> controller-2)
+diff --git a/pengine/test10/remote-unclean2.summary b/pengine/test10/remote-unclean2.summary
+index ad4af90..877eb4d 100644
+--- a/pengine/test10/remote-unclean2.summary
++++ b/pengine/test10/remote-unclean2.summary
+@@ -7,7 +7,7 @@ Online: [ rhel7-auto1 rhel7-auto2 rhel7-auto3 ]
+  rhel7-auto4	(ocf::pacemaker:remote):	FAILED rhel7-auto1 
+ 
+ Transition Summary:
+- * Fence rhel7-auto4
++ * Fence (reboot) rhel7-auto4
+  * Recover rhel7-auto4	(Started rhel7-auto1)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/start-then-stop-with-unfence.summary b/pengine/test10/start-then-stop-with-unfence.summary
+index 4430cc0..ae54afc 100644
+--- a/pengine/test10/start-then-stop-with-unfence.summary
++++ b/pengine/test10/start-then-stop-with-unfence.summary
+@@ -11,8 +11,7 @@ Online: [ rhel7-node1.example.com rhel7-node2.example.com ]
+      Stopped: [ rhel7-node1.example.com ]
+ 
+ Transition Summary:
+- * Fence rhel7-node2.example.com
+- * Fence rhel7-node1.example.com
++ * Fence (on) rhel7-node1.example.com
+  * Start   mpath-node1	(rhel7-node1.example.com)
+  * Move    ip1	(Started rhel7-node2.example.com -> rhel7-node1.example.com)
+  * Start   jrummy:1	(rhel7-node1.example.com)
+diff --git a/pengine/test10/stonith-0.summary b/pengine/test10/stonith-0.summary
+index 24008a1..ee8ae15 100644
+--- a/pengine/test10/stonith-0.summary
++++ b/pengine/test10/stonith-0.summary
+@@ -37,8 +37,8 @@ Online: [ c001n02 c001n04 c001n06 c001n07 c001n08 ]
+      ocf_msdummy:13	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n06 
+ 
+ Transition Summary:
+- * Fence c001n05
+- * Fence c001n03
++ * Fence (reboot) c001n05
++ * Fence (reboot) c001n03
+  * Move    ocf_192.168.100.181	(Started c001n03 -> c001n02)
+  * Move    heartbeat_192.168.100.182	(Started c001n03 -> c001n02)
+  * Recover ocf_192.168.100.183	(Started c001n03 -> c001n02)
+diff --git a/pengine/test10/stonith-1.summary b/pengine/test10/stonith-1.summary
+index 8556021..b68aca7 100644
+--- a/pengine/test10/stonith-1.summary
++++ b/pengine/test10/stonith-1.summary
+@@ -28,7 +28,7 @@ Online: [ sles-1 sles-2 sles-4 ]
+      ocf_msdummy:7	(ocf::heartbeat:Stateful):	Stopped 
+ 
+ Transition Summary:
+- * Fence sles-3
++ * Fence (reboot) sles-3
+  * Start   r192.168.100.183	(sles-1)
+  * Move    migrator	(Started sles-3 -> sles-4)
+  * Move    rsc_sles-3	(Started sles-3 -> sles-4)
+diff --git a/pengine/test10/stonith-2.summary b/pengine/test10/stonith-2.summary
+index 0f7cb99..eef35c4 100644
+--- a/pengine/test10/stonith-2.summary
++++ b/pengine/test10/stonith-2.summary
+@@ -33,7 +33,7 @@ Online: [ sles-1 sles-2 sles-3 sles-4 sles-6 ]
+      ocf_msdummy:11	(ocf::heartbeat:Stateful):	Slave sles-3 
+ 
+ Transition Summary:
+- * Fence sles-5
++ * Fence (reboot) sles-5
+  * Start   rsc_sles-5	(sles-6)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/stonith-3.summary b/pengine/test10/stonith-3.summary
+index cb25cc3..398b6bc 100644
+--- a/pengine/test10/stonith-3.summary
++++ b/pengine/test10/stonith-3.summary
+@@ -8,7 +8,7 @@ Online: [ rh5node2 ]
+      Stopped: [ rh5node1 rh5node2 ]
+ 
+ Transition Summary:
+- * Fence rh5node1
++ * Fence (reboot) rh5node1
+  * Start   prmIpPostgreSQLDB	(rh5node2)
+  * Start   prmStonith:0	(rh5node2)
+ 
+diff --git a/pengine/test10/stonith-4.summary b/pengine/test10/stonith-4.summary
+index dc7cd89..6e3e396 100644
+--- a/pengine/test10/stonith-4.summary
++++ b/pengine/test10/stonith-4.summary
+@@ -14,10 +14,10 @@ OFFLINE: [ pcmk-4 pcmk-6 ]
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
+ Transition Summary:
+- * Fence pcmk-8
+- * Fence pcmk-7
+- * Fence pcmk-5
+- * Fence pcmk-10
++ * Fence (reboot) pcmk-8
++ * Fence (reboot) pcmk-7
++ * Fence (reboot) pcmk-5
++ * Fence (reboot) pcmk-10
+  * Start   Fencing	(pcmk-1 - blocked)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/stop-failure-no-quorum.summary b/pengine/test10/stop-failure-no-quorum.summary
+index d864f1a..0248126 100644
+--- a/pengine/test10/stop-failure-no-quorum.summary
++++ b/pengine/test10/stop-failure-no-quorum.summary
+@@ -15,7 +15,7 @@ Online: [ pcmk-1 ]
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
+ Transition Summary:
+- * Fence pcmk-2
++ * Fence (reboot) pcmk-2
+  * Start   dlm:0	(pcmk-1 - blocked)
+  * Stop    clvm:0	(pcmk-2)
+  * Start   clvm:2	(pcmk-1 - blocked)
+diff --git a/pengine/test10/stop-failure-with-fencing.summary b/pengine/test10/stop-failure-with-fencing.summary
+index e01b6c4..e6c296b 100644
+--- a/pengine/test10/stop-failure-with-fencing.summary
++++ b/pengine/test10/stop-failure-with-fencing.summary
+@@ -14,7 +14,7 @@ Online: [ pcmk-1 ]
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
+ Transition Summary:
+- * Fence pcmk-2
++ * Fence (reboot) pcmk-2
+  * Start   dlm:0	(pcmk-1 - blocked)
+  * Stop    clvm:0	(pcmk-2)
+  * Start   clvm:1	(pcmk-1 - blocked)
+diff --git a/pengine/test10/systemhealth1.summary b/pengine/test10/systemhealth1.summary
+index 37b0b49..7301c6c 100644
+--- a/pengine/test10/systemhealth1.summary
++++ b/pengine/test10/systemhealth1.summary
+@@ -8,8 +8,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
+- * Fence hs21c
++ * Fence (reboot) hs21d
++ * Fence (reboot) hs21c
+ 
+ Executing cluster transition:
+  * Fencing hs21d (reboot)
+diff --git a/pengine/test10/systemhealth2.summary b/pengine/test10/systemhealth2.summary
+index a37ce18..c83a7e2 100644
+--- a/pengine/test10/systemhealth2.summary
++++ b/pengine/test10/systemhealth2.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+diff --git a/pengine/test10/systemhealth3.summary b/pengine/test10/systemhealth3.summary
+index a37ce18..c83a7e2 100644
+--- a/pengine/test10/systemhealth3.summary
++++ b/pengine/test10/systemhealth3.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+diff --git a/pengine/test10/systemhealthm1.summary b/pengine/test10/systemhealthm1.summary
+index 37b0b49..7301c6c 100644
+--- a/pengine/test10/systemhealthm1.summary
++++ b/pengine/test10/systemhealthm1.summary
+@@ -8,8 +8,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
+- * Fence hs21c
++ * Fence (reboot) hs21d
++ * Fence (reboot) hs21c
+ 
+ Executing cluster transition:
+  * Fencing hs21d (reboot)
+diff --git a/pengine/test10/systemhealthm2.summary b/pengine/test10/systemhealthm2.summary
+index a37ce18..c83a7e2 100644
+--- a/pengine/test10/systemhealthm2.summary
++++ b/pengine/test10/systemhealthm2.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+diff --git a/pengine/test10/systemhealthm3.summary b/pengine/test10/systemhealthm3.summary
+index b10d3f2..fbcdec5 100644
+--- a/pengine/test10/systemhealthm3.summary
++++ b/pengine/test10/systemhealthm3.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+ 
+ Executing cluster transition:
+  * Resource action: stonith-1       monitor on hs21c
+diff --git a/pengine/test10/systemhealthn1.summary b/pengine/test10/systemhealthn1.summary
+index 37b0b49..7301c6c 100644
+--- a/pengine/test10/systemhealthn1.summary
++++ b/pengine/test10/systemhealthn1.summary
+@@ -8,8 +8,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
+- * Fence hs21c
++ * Fence (reboot) hs21d
++ * Fence (reboot) hs21c
+ 
+ Executing cluster transition:
+  * Fencing hs21d (reboot)
+diff --git a/pengine/test10/systemhealthn2.summary b/pengine/test10/systemhealthn2.summary
+index a37ce18..c83a7e2 100644
+--- a/pengine/test10/systemhealthn2.summary
++++ b/pengine/test10/systemhealthn2.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+diff --git a/pengine/test10/systemhealthn3.summary b/pengine/test10/systemhealthn3.summary
+index a37ce18..c83a7e2 100644
+--- a/pengine/test10/systemhealthn3.summary
++++ b/pengine/test10/systemhealthn3.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+diff --git a/pengine/test10/systemhealtho1.summary b/pengine/test10/systemhealtho1.summary
+index 37b0b49..7301c6c 100644
+--- a/pengine/test10/systemhealtho1.summary
++++ b/pengine/test10/systemhealtho1.summary
+@@ -8,8 +8,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
+- * Fence hs21c
++ * Fence (reboot) hs21d
++ * Fence (reboot) hs21c
+ 
+ Executing cluster transition:
+  * Fencing hs21d (reboot)
+diff --git a/pengine/test10/systemhealtho2.summary b/pengine/test10/systemhealtho2.summary
+index b10d3f2..fbcdec5 100644
+--- a/pengine/test10/systemhealtho2.summary
++++ b/pengine/test10/systemhealtho2.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+ 
+ Executing cluster transition:
+  * Resource action: stonith-1       monitor on hs21c
+diff --git a/pengine/test10/systemhealtho3.summary b/pengine/test10/systemhealtho3.summary
+index b10d3f2..fbcdec5 100644
+--- a/pengine/test10/systemhealtho3.summary
++++ b/pengine/test10/systemhealtho3.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+ 
+ Executing cluster transition:
+  * Resource action: stonith-1       monitor on hs21c
+diff --git a/pengine/test10/systemhealthp1.summary b/pengine/test10/systemhealthp1.summary
+index 37b0b49..7301c6c 100644
+--- a/pengine/test10/systemhealthp1.summary
++++ b/pengine/test10/systemhealthp1.summary
+@@ -8,8 +8,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
+- * Fence hs21c
++ * Fence (reboot) hs21d
++ * Fence (reboot) hs21c
+ 
+ Executing cluster transition:
+  * Fencing hs21d (reboot)
+diff --git a/pengine/test10/systemhealthp2.summary b/pengine/test10/systemhealthp2.summary
+index 6605e12..ea9465b 100644
+--- a/pengine/test10/systemhealthp2.summary
++++ b/pengine/test10/systemhealthp2.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+  * Start   apache_1	(hs21c)
+  * Start   nfs_1	(hs21c)
+ 
+diff --git a/pengine/test10/systemhealthp3.summary b/pengine/test10/systemhealthp3.summary
+index b10d3f2..fbcdec5 100644
+--- a/pengine/test10/systemhealthp3.summary
++++ b/pengine/test10/systemhealthp3.summary
+@@ -8,7 +8,7 @@ Online: [ hs21c ]
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
+ Transition Summary:
+- * Fence hs21d
++ * Fence (reboot) hs21d
+ 
+ Executing cluster transition:
+  * Resource action: stonith-1       monitor on hs21c
+diff --git a/pengine/test10/ticket-clone-21.summary b/pengine/test10/ticket-clone-21.summary
+index 50df628..573f8c1 100644
+--- a/pengine/test10/ticket-clone-21.summary
++++ b/pengine/test10/ticket-clone-21.summary
+@@ -7,8 +7,8 @@ Online: [ node1 node2 ]
+      Started: [ node1 node2 ]
+ 
+ Transition Summary:
+- * Fence node2
+- * Fence node1
++ * Fence (reboot) node2
++ * Fence (reboot) node1
+  * Stop    rsc_stonith	(node1)
+  * Stop    rsc1:0	(node1)
+  * Stop    rsc1:1	(node2)
+diff --git a/pengine/test10/ticket-clone-9.summary b/pengine/test10/ticket-clone-9.summary
+index 50df628..573f8c1 100644
+--- a/pengine/test10/ticket-clone-9.summary
++++ b/pengine/test10/ticket-clone-9.summary
+@@ -7,8 +7,8 @@ Online: [ node1 node2 ]
+      Started: [ node1 node2 ]
+ 
+ Transition Summary:
+- * Fence node2
+- * Fence node1
++ * Fence (reboot) node2
++ * Fence (reboot) node1
+  * Stop    rsc_stonith	(node1)
+  * Stop    rsc1:0	(node1)
+  * Stop    rsc1:1	(node2)
+diff --git a/pengine/test10/ticket-group-21.summary b/pengine/test10/ticket-group-21.summary
+index eab14a9..ff809ae 100644
+--- a/pengine/test10/ticket-group-21.summary
++++ b/pengine/test10/ticket-group-21.summary
+@@ -8,7 +8,7 @@ Online: [ node1 node2 ]
+      rsc2	(ocf::pacemaker:Dummy):	Started node2
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+  * Stop    rsc2	(node2)
+ 
+diff --git a/pengine/test10/ticket-group-9.summary b/pengine/test10/ticket-group-9.summary
+index eab14a9..ff809ae 100644
+--- a/pengine/test10/ticket-group-9.summary
++++ b/pengine/test10/ticket-group-9.summary
+@@ -8,7 +8,7 @@ Online: [ node1 node2 ]
+      rsc2	(ocf::pacemaker:Dummy):	Started node2
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+  * Stop    rsc2	(node2)
+ 
+diff --git a/pengine/test10/ticket-master-21.summary b/pengine/test10/ticket-master-21.summary
+index a107a38..c196c9d 100644
+--- a/pengine/test10/ticket-master-21.summary
++++ b/pengine/test10/ticket-master-21.summary
+@@ -8,7 +8,7 @@ Online: [ node1 node2 ]
+      Slaves: [ node2 ]
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Move    rsc_stonith	(Started node1 -> node2)
+  * Demote  rsc1:0	(Master -> Stopped node1)
+ 
+diff --git a/pengine/test10/ticket-master-9.summary b/pengine/test10/ticket-master-9.summary
+index a107a38..c196c9d 100644
+--- a/pengine/test10/ticket-master-9.summary
++++ b/pengine/test10/ticket-master-9.summary
+@@ -8,7 +8,7 @@ Online: [ node1 node2 ]
+      Slaves: [ node2 ]
+ 
+ Transition Summary:
+- * Fence node1
++ * Fence (reboot) node1
+  * Move    rsc_stonith	(Started node1 -> node2)
+  * Demote  rsc1:0	(Master -> Stopped node1)
+ 
+diff --git a/pengine/test10/ticket-primitive-21.summary b/pengine/test10/ticket-primitive-21.summary
+index 918b743..08a4860 100644
+--- a/pengine/test10/ticket-primitive-21.summary
++++ b/pengine/test10/ticket-primitive-21.summary
+@@ -6,7 +6,7 @@ Online: [ node1 node2 ]
+  rsc1	(ocf::pacemaker:Dummy):	Started node2
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/ticket-primitive-9.summary b/pengine/test10/ticket-primitive-9.summary
+index 918b743..08a4860 100644
+--- a/pengine/test10/ticket-primitive-9.summary
++++ b/pengine/test10/ticket-primitive-9.summary
+@@ -6,7 +6,7 @@ Online: [ node1 node2 ]
+  rsc1	(ocf::pacemaker:Dummy):	Started node2
+ 
+ Transition Summary:
+- * Fence node2
++ * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+ 
+ Executing cluster transition:
+diff --git a/pengine/test10/unfence-definition.summary b/pengine/test10/unfence-definition.summary
+index 03506a3..9477a02 100644
+--- a/pengine/test10/unfence-definition.summary
++++ b/pengine/test10/unfence-definition.summary
+@@ -12,11 +12,9 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
+ Transition Summary:
+- * Fence virt-4
+- * Fence virt-4
+- * Fence virt-3
+- * Fence virt-2
+- * Fence virt-1
++ * Fence (reboot) virt-4
++ * Fence (on) virt-3
++ * Fence (on) virt-1
+  * Restart fencing	(Started virt-1)
+  * Restart dlm:0	(Started virt-1)
+  * Start   dlm:2	(virt-3)
+diff --git a/pengine/test10/unfence-parameters.summary b/pengine/test10/unfence-parameters.summary
+index 5cc4a4b..a713cd5 100644
+--- a/pengine/test10/unfence-parameters.summary
++++ b/pengine/test10/unfence-parameters.summary
+@@ -12,11 +12,10 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
+ Transition Summary:
+- * Fence virt-4
+- * Fence virt-4
+- * Fence virt-3
+- * Fence virt-2
+- * Fence virt-1
++ * Fence (reboot) virt-4
++ * Fence (on) virt-3
++ * Fence (on) virt-2
++ * Fence (on) virt-1
+  * Restart fencing	(Started virt-1)
+  * Restart dlm:0	(Started virt-1)
+  * Restart dlm:1	(Started virt-2)
+diff --git a/pengine/test10/unfence-startup.summary b/pengine/test10/unfence-startup.summary
+index 6cd38ad..c3f1be4 100644
+--- a/pengine/test10/unfence-startup.summary
++++ b/pengine/test10/unfence-startup.summary
+@@ -12,11 +12,8 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
+ Transition Summary:
+- * Fence virt-4
+- * Fence virt-4
+- * Fence virt-3
+- * Fence virt-2
+- * Fence virt-1
++ * Fence (reboot) virt-4
++ * Fence (on) virt-3
+  * Start   dlm:2	(virt-3)
+  * Start   clvmd:1	(virt-2)
+  * Start   clvmd:2	(virt-3)
+diff --git a/pengine/test10/whitebox-fail1.summary b/pengine/test10/whitebox-fail1.summary
+index 5f70a66..57d72ba 100644
+--- a/pengine/test10/whitebox-fail1.summary
++++ b/pengine/test10/whitebox-fail1.summary
+@@ -14,7 +14,7 @@ Containers: [ lxc2:container2 ]
+  D	(ocf::pacemaker:Dummy):	Started 18node1
+ 
+ Transition Summary:
+- * Fence lxc1 (resource: container1)
++ * Fence (reboot) lxc1 (resource: container1)
+  * Recover container1	(Started 18node2)
+  * Recover M:4	(Started lxc1)
+  * Recover B	(Started lxc1)
+diff --git a/pengine/test10/whitebox-fail2.summary b/pengine/test10/whitebox-fail2.summary
+index 2922f16..bf12683 100644
+--- a/pengine/test10/whitebox-fail2.summary
++++ b/pengine/test10/whitebox-fail2.summary
+@@ -14,7 +14,7 @@ Containers: [ lxc2:container2 ]
+  D	(ocf::pacemaker:Dummy):	Started 18node1
+ 
+ Transition Summary:
+- * Fence lxc1 (resource: container1)
++ * Fence (reboot) lxc1 (resource: container1)
+  * Recover container1	(Started 18node2)
+  * Recover M:4	(Started lxc1)
+  * Recover B	(Started lxc1)
+diff --git a/pengine/test10/whitebox-imply-stop-on-fence.summary b/pengine/test10/whitebox-imply-stop-on-fence.summary
+index 31cc4a5..2fb20a6 100644
+--- a/pengine/test10/whitebox-imply-stop-on-fence.summary
++++ b/pengine/test10/whitebox-imply-stop-on-fence.summary
+@@ -25,9 +25,9 @@ Containers: [ lxc-01_kiff-02:R-lxc-01_kiff-02 lxc-02_kiff-02:R-lxc-02_kiff-02 ]
+  vm-fs	(ocf::heartbeat:Filesystem):	FAILED lxc-01_kiff-01
+ 
+ Transition Summary:
+- * Fence lxc-02_kiff-01 (resource: R-lxc-02_kiff-01)
+- * Fence lxc-01_kiff-01 (resource: R-lxc-01_kiff-01)
+- * Fence kiff-01
++ * Fence (reboot) lxc-02_kiff-01 (resource: R-lxc-02_kiff-01)
++ * Fence (reboot) lxc-01_kiff-01 (resource: R-lxc-01_kiff-01)
++ * Fence (reboot) kiff-01
+  * Move    fence-kiff-02	(Started kiff-01 -> kiff-02)
+  * Stop    dlm:0	(kiff-01)
+  * Stop    clvmd:0	(kiff-01)
+diff --git a/pengine/test10/whitebox-ms-ordering.summary b/pengine/test10/whitebox-ms-ordering.summary
+index fcdef66..2230d0f 100644
+--- a/pengine/test10/whitebox-ms-ordering.summary
++++ b/pengine/test10/whitebox-ms-ordering.summary
+@@ -9,8 +9,8 @@ Online: [ 18node1 18node2 18node3 ]
+      Stopped: [ 18node1 18node2 18node3 ]
+ 
+ Transition Summary:
+- * Fence lxc2 (resource: container2)
+- * Fence lxc1 (resource: container1)
++ * Fence (reboot) lxc2 (resource: container2)
++ * Fence (reboot) lxc1 (resource: container1)
+  * Start   container1	(18node1)
+  * Start   container2	(18node1)
+  * Recover lxc-ms:0	(Master lxc1)
+diff --git a/pengine/test10/whitebox-unexpectedly-running.summary b/pengine/test10/whitebox-unexpectedly-running.summary
+index ed0a5bd..eabeb4d 100644
+--- a/pengine/test10/whitebox-unexpectedly-running.summary
++++ b/pengine/test10/whitebox-unexpectedly-running.summary
+@@ -5,7 +5,7 @@ Online: [ 18builder ]
+  FAKE	(ocf::pacemaker:Dummy):	FAILED 18builder 
+ 
+ Transition Summary:
+- * Fence remote1 (resource: FAKE)
++ * Fence (reboot) remote1 (resource: FAKE)
+  * Recover FAKE	(Started 18builder)
+  * Start   remote1	(18builder)
+ 
+-- 
+2.5.5
+

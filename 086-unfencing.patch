@@ -1,0 +1,56 @@
+From 736725733cc23897b4f18d59db24747077092ed6 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Wed, 26 Jul 2017 13:51:15 +1000
+Subject: [PATCH 5/6] Fix: Correctly compare remote unfencing digests
+
+---
+ lib/pengine/utils.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/lib/pengine/utils.c b/lib/pengine/utils.c
+index 90da95a..5d2a1b9 100644
+--- a/lib/pengine/utils.c
++++ b/lib/pengine/utils.c
+@@ -2101,20 +2101,24 @@ fencing_action_digest_cmp(resource_t * rsc, node_t * node, pe_working_set_t * da
+     const char *digest_all = g_hash_table_lookup(node->details->attrs, "digests-all");
+     const char *digest_secure = g_hash_table_lookup(node->details->attrs, "digests-secure");
+  
+-    /* No restarts for fencing device changes */
++    /* No 'reloads' for fencing device changes
++     *
++     * We use the resource id + agent + digest so that we can detect
++     * changes to the agent and/or the parameters used
++     */
++    char *search_all = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
++    char *search_secure = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
+  
+     data->rc = RSC_DIGEST_ALL;
+     if (digest_all == NULL) {
+          /* it is unknown what the previous op digest was */
+          data->rc = RSC_DIGEST_UNKNOWN;
+  
+-    } else if (strcmp(digest_all, data->digest_all_calc) == 0) {
++    } else if (strstr(digest_all, search_all)) {
+         data->rc = RSC_DIGEST_MATCH;
+ 
+     } else if(digest_secure && data->digest_secure_calc) {
+-        char *search = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
+-
+-        if(strstr(digest_secure, search)) {
++        if(strstr(digest_secure, search_secure)) {
+             fprintf(stdout, "Only 'private' parameters to %s for unfencing %s changed\n",
+                     rsc->id, node->details->uname);
+             data->rc = RSC_DIGEST_MATCH;
+@@ -2127,6 +2131,9 @@ fencing_action_digest_cmp(resource_t * rsc, node_t * node, pe_working_set_t * da
+     }
+  
+     free(key);
++    free(search_all);
++    free(search_secure);
++
+     return data;
+ }
+ 
+-- 
+2.5.5
+

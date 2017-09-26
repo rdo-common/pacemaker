@@ -14,7 +14,7 @@
 ## can be incremented to build packages reliably considered "newer"
 ## than previously built packages with the same pcmkversion)
 %global pcmkversion 1.1.16
-%global specversion 10
+%global specversion 12
 
 ## Upstream commit (or git tag, such as "Pacemaker-" plus the
 ## {pcmkversion} macro for an official release) to use for this package
@@ -143,7 +143,7 @@
 Name:          pacemaker
 Summary:       Scalable High-Availability cluster resource manager
 Version:       %{pcmkversion}
-Release:       %{pcmk_release}%{?dist}
+Release:       %{pcmk_release}.el7_4.2.0.0.rdo1
 %if %{defined _unitdir}
 License:       GPLv2+ and LGPLv2+
 %else
@@ -219,6 +219,32 @@ Patch58:        058-guest-cleanup.patch
 Patch59:        059-soname-compat.patch
 Patch60:        060-bundle-remote-fixes.patch
 Patch61:        061-bundle-memory-fix.patch
+Patch62:        062-remote-recovery.patch
+Patch63:        063-empty-remotes.patch
+Patch64:        064-bundle-meta.patch
+Patch65:        065-coverity-cleanup.patch
+Patch66:        066-forward-compat.patch
+Patch67:        067-bundle-constraints.patch
+Patch68:        068-bundle-weight-fix.patch
+Patch80:        080-log-node-events.patch
+Patch82:        082-use-docker-resource-location.patch
+Patch83:        083-nested-container-connections.patch
+Patch84:        084-unfencing.patch
+Patch85:        085-unfencing.patch
+Patch86:        086-unfencing.patch
+Patch87:        087-unfencing.patch
+Patch88:        088-unfencing.patch
+Patch89:        089-container-notify.patch
+Patch90:        090-unfencing.patch
+Patch91:        091-unfencing.patch
+Patch92:        092-bundle-ordering.patch
+Patch93:        093-bundle-host-atttrs.patch
+Patch94:        094-fix-attrd-queries.patch
+Patch95:        095-colocation-with-bundles.patch
+Patch96:        096-bundle-host-atttrs.patch
+Patch97:        097-bundle-host-atttrs.patch
+Patch98:        098-Fix-PE-Prevent-graph-loops-when-fencing-the-host-out.patch
+Patch99:        099-Fix-PE-Do-not-send-notifications-to-unclean-bundles.patch
 
 # patches that aren't from upstream
 Patch100:      lrmd-protocol-version.patch
@@ -888,6 +914,17 @@ exit 0
 %attr(0644,root,root) %{_datadir}/pacemaker/nagios/plugins-metadata/*
 
 %changelog
+* Tue Sep 26 2017 Michele Baldessari <michele@acksyn.org> - 1.1.16-12.0.0.rdo1
+- Add future zstream patches in order to fix LP#1713007
+
+* Tue Jun 20 2017 Ken Gaillot <kgaillot@redhat.com> - 1.1.16-12
+- Avoid unnecessary restarts when recovering remote connections
+- Resolves: rhbz#1448773
+
+* Fri Jun 9 2017 Ken Gaillot <kgaillot@redhat.com> - 1.1.16-11
+- Support bundle meta-attributes
+- Resolves: rhbz#1447903
+
 * Tue May 23 2017 Ken Gaillot <kgaillot@redhat.com> - 1.1.16-10
 - Fix issues when running bundles on Pacemaker Remote nodes
 - Reap orphaned processes when running Pacemaker Remote as pid 1

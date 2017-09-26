@@ -1,0 +1,301 @@
+From 65856b5096435460685845d7e1e2fc6e3eb5f480 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Thu, 17 Aug 2017 11:48:17 +1000
+Subject: [PATCH] PE/attrd: Allow bundle resources to read/write attributes
+ based on the physical host rather than the container name
+
+---
+ include/crm/msg_xml.h                           |  1 +
+ include/crm/pengine/internal.h                  |  2 +
+ include/crm_internal.h                          |  3 ++
+ lib/pengine/common.c                            | 52 ++++++++++++++++++++++++
+ lib/pengine/container.c                         |  5 ++-
+ lib/pengine/unpack.c                            | 22 +++++-----
+ lib/pengine/utils.c                             |  4 +-
+ lib/pengine/variant.h                           |  1 +
+ pengine/allocate.c                              |  3 +-
+ pengine/constraints.c                           |  8 ++--
+ pengine/graph.c                                 | 39 ++++++++++++++++++
+ pengine/master.c                                | 16 +++-----
+ pengine/native.c                                | 20 ++++-----
+ tools/attrd_updater.c                           | 30 ++++++++++++++
+ tools/crm_mon.c                                 |  2 +-
+ 40 files changed, 345 insertions(+), 221 deletions(-)
+
+diff --git a/include/crm/msg_xml.h b/include/crm/msg_xml.h
+index 0004dd6..e6bc5d0 100644
+--- a/include/crm/msg_xml.h
++++ b/include/crm/msg_xml.h
+@@ -190,6 +190,7 @@
+ 
+ #  define XML_CIB_TAG_RSC_TEMPLATE	"template"
+ 
++#  define XML_RSC_ATTR_TARGET           "container-attribute-target"
+ #  define XML_RSC_ATTR_ISOLATION_INSTANCE	"isolation-instance"
+ #  define XML_RSC_ATTR_ISOLATION_WRAPPER    "isolation-wrapper"
+ #  define XML_RSC_ATTR_ISOLATION_HOST   "isolation-host"
+diff --git a/include/crm/pengine/internal.h b/include/crm/pengine/internal.h
+index 4bde6b6..9cad243 100644
+--- a/include/crm/pengine/internal.h
++++ b/include/crm/pengine/internal.h
+@@ -293,5 +293,6 @@ bool remote_id_conflict(const char *remote_name, pe_working_set_t *data);
+ void common_print(resource_t * rsc, const char *pre_text, const char *name, node_t *node, long options, void *print_data);
+ resource_t *find_container_child(const char *stem, resource_t * rsc, node_t *node);
+ bool fix_remote_addr(resource_t * rsc);
++const char *node_attribute_calculated(pe_node_t *node, const char *name, resource_t *rsc);
+ 
+ #endif
+diff --git a/include/crm_internal.h b/include/crm_internal.h
+index 66d91ae..b2bc0b0 100644
+--- a/include/crm_internal.h
++++ b/include/crm_internal.h
+@@ -285,6 +285,7 @@ long crm_read_pidfile(const char *filename);
+ #  define ATTRD_OP_FLUSH         "flush"
+ #  define ATTRD_OP_SYNC          "sync"
+ #  define ATTRD_OP_SYNC_RESPONSE "sync-response"
++#  define PCMK_ENV_PHYSICAL_HOST "physical_host"
+ 
+ #  if SUPPORT_COROSYNC
+ #    if CS_USES_LIBQB
+diff --git a/lib/pengine/common.c b/lib/pengine/common.c
+index cd27561..101f17e 100644
+--- a/lib/pengine/common.c
++++ b/lib/pengine/common.c
+@@ -431,3 +431,41 @@ add_hash_param(GHashTable * hash, const char *name, const char *value)
+         g_hash_table_insert(hash, strdup(name), strdup(value));
+     }
+ }
++
++const char *
++node_attribute_calculated(pe_node_t *node, const char *name, resource_t *rsc) 
++{
++    const char *source;
++
++    if(node == NULL) {
++        return NULL;
++
++    } else if(rsc == NULL) {
++        return g_hash_table_lookup(node->details->attrs, name);
++    }
++
++    source = g_hash_table_lookup(rsc->meta, XML_RSC_ATTR_TARGET);
++    if(source == NULL || safe_str_eq("host", source) == FALSE) {
++        return g_hash_table_lookup(node->details->attrs, name);
++    }
++
++    /* Use attributes set for the containers location
++     * instead of for the container itself
++     *
++     * Useful when the container is using the host's local
++     * storage
++     */
++
++    CRM_ASSERT(node->details->remote_rsc);
++    CRM_ASSERT(node->details->remote_rsc->container);
++
++    if(node->details->remote_rsc->container->running_on) {
++        pe_node_t *host = node->details->remote_rsc->container->running_on->data;
++        pe_rsc_trace(rsc, "%s: Looking for %s on the container host %s", rsc->id, name, host->details->uname);
++        return g_hash_table_lookup(host->details->attrs, name);
++    }
++
++    pe_rsc_trace(rsc, "%s: Not looking for %s on the container host: %s is inactive",
++                 rsc->id, name, node->details->remote_rsc->container->id);
++    return NULL;
++}
+diff --git a/lib/pengine/container.c b/lib/pengine/container.c
+index 253f8ff..d3073cf 100644
+--- a/lib/pengine/container.c
++++ b/lib/pengine/container.c
+@@ -742,8 +742,12 @@ container_unpack(resource_t * rsc, pe_working_set_t * data_set)
+ 
+             offset += allocate_ip(container_data, tuple, buffer+offset, max-offset);
+             container_data->tuples = g_list_append(container_data->tuples, tuple);
+-        }
+-        container_data->docker_host_options = buffer;
++            container_data->attribute_target = g_hash_table_lookup(tuple->child->meta, XML_RSC_ATTR_TARGET);
++         }
++         container_data->docker_host_options = buffer;
++         if(container_data->attribute_target) {
++             g_hash_table_replace(rsc->meta, strdup(XML_RSC_ATTR_TARGET), strdup(container_data->attribute_target));
++         }
+ 
+     } else {
+         // Just a naked container, no pacemaker-remote
+diff --git a/lib/pengine/variant.h b/lib/pengine/variant.h
+index c8fe159..4ceaa6b 100644
+--- a/lib/pengine/variant.h
++++ b/lib/pengine/variant.h
+@@ -100,6 +100,7 @@ typedef struct container_variant_data_s {
+         char *docker_host_options;
+         char *docker_run_options;
+         char *docker_run_command;
++        const char *attribute_target;
+ 
+         resource_t *child;
+ 
+diff --git a/pengine/constraints.c b/pengine/constraints.c
+index 501cb57..d7a147d 100644
+--- a/pengine/constraints.c
++++ b/pengine/constraints.c
+@@ -952,7 +952,7 @@ unpack_location(xmlNode * xml_obj, pe_working_set_t * data_set)
+ }
+ 
+ static int
+-get_node_score(const char *rule, const char *score, gboolean raw, node_t * node)
++get_node_score(const char *rule, const char *score, gboolean raw, node_t * node, resource_t *rsc)
+ {
+     int score_f = 0;
+ 
+@@ -963,7 +963,7 @@ get_node_score(const char *rule, const char *score, gboolean raw, node_t * node)
+         score_f = char2score(score);
+ 
+     } else {
+-        const char *attr_score = g_hash_table_lookup(node->details->attrs, score);
++        const char *attr_score = node_attribute_calculated(node, score, rsc);
+ 
+         if (attr_score == NULL) {
+             crm_debug("Rule %s: node %s did not have a value for %s",
+@@ -1055,7 +1055,7 @@ generate_location_rule(resource_t * rsc, xmlNode * rule_xml, const char *discove
+         for (gIter = match_L; gIter != NULL; gIter = gIter->next) {
+             node_t *node = (node_t *) gIter->data;
+ 
+-            node->weight = get_node_score(rule_id, score, raw_score, node);
++            node->weight = get_node_score(rule_id, score, raw_score, node, rsc);
+         }
+     }
+ 
+@@ -1068,7 +1068,7 @@ generate_location_rule(resource_t * rsc, xmlNode * rule_xml, const char *discove
+         crm_trace("Rule %s %s on %s", ID(rule_xml), accept ? "passed" : "failed",
+                   node->details->uname);
+ 
+-        score_f = get_node_score(rule_id, score, raw_score, node);
++        score_f = get_node_score(rule_id, score, raw_score, node, rsc);
+ /* 			if(accept && score_f == -INFINITY) { */
+ /* 				accept = FALSE; */
+ /* 			} */
+diff --git a/pengine/graph.c b/pengine/graph.c
+index 1a92636..c5feea1 100644
+--- a/pengine/graph.c
++++ b/pengine/graph.c
+@@ -1135,6 +1135,45 @@ action2xml(action_t * action, gboolean as_input, pe_working_set_t *data_set)
+             hash2smartfield((gpointer)"pcmk_external_ip", (gpointer)value, (gpointer)args_xml);
+         }
+ 
++        if(is_container_remote_node(action->node)) {
++            pe_node_t *host = NULL;
++            enum action_tasks task = text2task(action->task);
++
++            if(task == action_notify || task == action_notified) {
++                const char *n_task = g_hash_table_lookup(action->meta, "notify_operation");
++                task = text2task(n_task);
++            }
++
++            // Differentiate between up and down actions
++            switch (task) {
++                case stop_rsc:
++                case stopped_rsc:
++                case action_demote:
++                case action_demoted:
++                    if(action->node->details->remote_rsc->container->running_on) {
++                        host = action->node->details->remote_rsc->container->running_on->data;
++                    }
++                    break;
++                case start_rsc:
++                case started_rsc:
++                case monitor_rsc:
++                case action_promote:
++                case action_promoted:
++                    if(action->node->details->remote_rsc->container->allocated_to) {
++                        host = action->node->details->remote_rsc->container->allocated_to;
++                    }
++                    break;
++                default:
++                    break;
++            }
++
++            if(host) {
++                hash2metafield((gpointer)XML_RSC_ATTR_TARGET,
++                               (gpointer)g_hash_table_lookup(action->rsc->meta, XML_RSC_ATTR_TARGET), (gpointer)args_xml);
++                hash2metafield((gpointer)PCMK_ENV_PHYSICAL_HOST, (gpointer)host->details->uname, (gpointer)args_xml);
++            }
++        }
++
+     } else if (safe_str_eq(action->task, CRM_OP_FENCE) && action->node) {
+         g_hash_table_foreach(action->node->details->attrs, hash2metafield, args_xml);
+     }
+diff --git a/pengine/master.c b/pengine/master.c
+index 8c39f49..7f60c5f 100644
+--- a/pengine/master.c
++++ b/pengine/master.c
+@@ -511,11 +511,7 @@ master_score(resource_t * rsc, node_t * node, int not_set_value)
+     attr_name = calloc(1, len);
+     sprintf(attr_name, "master-%s", name);
+ 
+-    if (node) {
+-        attr_value = g_hash_table_lookup(node->details->attrs, attr_name);
+-        pe_rsc_trace(rsc, "%s: %s[%s] = %s", rsc->id, attr_name, node->details->uname,
+-                     crm_str(attr_value));
+-    }
++    attr_value = node_attribute_calculated(node, attr_name, rsc);
+ 
+     if (attr_value != NULL) {
+         score = char2score(attr_value);
+diff --git a/tools/attrd_updater.c b/tools/attrd_updater.c
+index 12135c8..250b03e 100644
+--- a/tools/attrd_updater.c
++++ b/tools/attrd_updater.c
+@@ -79,6 +79,7 @@ static int do_query(const char *attr_name, const char *attr_node, gboolean query
+ static int do_update(char command, const char *attr_node, const char *attr_name,
+                      const char *attr_value, const char *attr_section,
+                      const char *attr_set, const char *attr_dampen, int attr_options);
++static const char *get_hostname(const char *name);
+ 
+ int
+ main(int argc, char **argv)
+@@ -186,6 +187,7 @@ main(int argc, char **argv)
+         crm_help('?', EX_USAGE);
+ #endif
+     } else {
++        attr_node = get_hostname(attr_node);
+         crm_exit(do_update(command, attr_node, attr_name, attr_value,
+                            attr_section, attr_set, attr_dampen, attr_options));
+     }
+@@ -339,6 +341,8 @@ do_query(const char *attr_name, const char *attr_node, gboolean query_all)
+         attr_node = "localhost";
+     }
+ 
++    attr_node = get_hostname(attr_node);
++
+     /* Build and send attrd request, and get XML reply */
+     rc = send_attrd_query(attr_name, attr_node, &reply);
+     if (rc != pcmk_ok) {
+@@ -382,3 +386,28 @@ do_update(char command, const char *attr_node, const char *attr_name,
+     }
+     return rc;
+ }
++
++static const char *
++get_hostname(const char *name)
++{
++    if(name != NULL
++       && safe_str_neq(name, "auto")
++       && safe_str_neq(name, "localhost")) {
++        return name;
++
++    } else {
++        const char *target = getenv(crm_meta_name(XML_RSC_ATTR_TARGET));
++        const char *host_pyhsical = getenv(crm_meta_name(PCMK_ENV_PHYSICAL_HOST));
++        const char *host_pcmk = getenv("OCF_RESKEY_" CRM_META "_" XML_LRM_ATTR_TARGET);
++
++        /* It is important we use the names by which the PE knows us */
++        if(safe_str_eq(target, "host") && host_pyhsical != NULL) {
++            return host_pyhsical;
++
++        } else if(host_pcmk) {
++            return host_pcmk;
++        }
++    }
++
++    return name;
++}

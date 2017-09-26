@@ -1,0 +1,2894 @@
+From 7f8ba3076f180aae699df78609b0573e56a7c379 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Wed, 26 Jul 2017 10:34:48 +1000
+Subject: [PATCH 4/6] Support unfencing of remote nodes
+
+---
+ crmd/te_callbacks.c                                |  21 +-
+ include/crm/msg_xml.h                              |   1 +
+ include/crm/pengine/internal.h                     |   2 +-
+ lib/pengine/utils.c                                | 291 +++++++++++++++------
+ pengine/allocate.c                                 |   4 +-
+ pengine/native.c                                   |  39 ++-
+ pengine/test10/594.scores                          |   1 +
+ pengine/test10/594.summary                         |   1 +
+ pengine/test10/829.scores                          |   1 +
+ pengine/test10/829.summary                         |   1 +
+ pengine/test10/bug-5186-partial-migrate.scores     |   1 +
+ pengine/test10/bug-5186-partial-migrate.summary    |   1 +
+ pengine/test10/bug-cl-5247.scores                  |   1 +
+ pengine/test10/bug-cl-5247.summary                 |   1 +
+ pengine/test10/bug-lf-2508.scores                  |   1 +
+ pengine/test10/bug-lf-2508.summary                 |   1 +
+ pengine/test10/bug-lf-2551.scores                  |   1 +
+ pengine/test10/bug-lf-2551.summary                 |   1 +
+ pengine/test10/bug-lf-2606.scores                  |   1 +
+ pengine/test10/bug-lf-2606.summary                 |   1 +
+ pengine/test10/bug-rh-1097457.scores               |   1 +
+ pengine/test10/bug-rh-1097457.summary              |   1 +
+ pengine/test10/concurrent-fencing.scores           |   3 +
+ pengine/test10/concurrent-fencing.summary          |   3 +
+ pengine/test10/guest-node-host-dies.scores         |   3 +
+ pengine/test10/guest-node-host-dies.summary        |   3 +
+ pengine/test10/interleave-pseudo-stop.scores       |   1 +
+ pengine/test10/interleave-pseudo-stop.summary      |   1 +
+ pengine/test10/master-7.scores                     |   1 +
+ pengine/test10/master-7.summary                    |   1 +
+ pengine/test10/master-8.scores                     |   1 +
+ pengine/test10/master-8.summary                    |   1 +
+ pengine/test10/migrate-fencing.scores              |   1 +
+ pengine/test10/migrate-fencing.summary             |   1 +
+ pengine/test10/per-op-failcount.scores             |   1 +
+ pengine/test10/per-op-failcount.summary            |   1 +
+ pengine/test10/rec-node-11.scores                  |   1 +
+ pengine/test10/rec-node-11.summary                 |   1 +
+ pengine/test10/rec-node-12.scores                  |   1 +
+ pengine/test10/rec-node-12.summary                 |   1 +
+ pengine/test10/rec-node-13.scores                  |   1 +
+ pengine/test10/rec-node-13.summary                 |   1 +
+ pengine/test10/rec-node-14.scores                  |   3 +
+ pengine/test10/rec-node-14.summary                 |   3 +
+ pengine/test10/rec-node-15.scores                  |   1 +
+ pengine/test10/rec-node-15.summary                 |   1 +
+ pengine/test10/rec-node-2.scores                   |   1 +
+ pengine/test10/rec-node-2.summary                  |   1 +
+ pengine/test10/rec-node-4.scores                   |   1 +
+ pengine/test10/rec-node-4.summary                  |   1 +
+ pengine/test10/rec-node-6.scores                   |   1 +
+ pengine/test10/rec-node-6.summary                  |   1 +
+ pengine/test10/rec-node-7.scores                   |   1 +
+ pengine/test10/rec-node-7.summary                  |   1 +
+ pengine/test10/rec-rsc-5.scores                    |   1 +
+ pengine/test10/rec-rsc-5.summary                   |   1 +
+ .../test10/remote-fence-before-reconnect.scores    |   1 +
+ .../test10/remote-fence-before-reconnect.summary   |   1 +
+ pengine/test10/remote-fence-unclean-3.scores       |   1 +
+ pengine/test10/remote-fence-unclean-3.summary      |   1 +
+ pengine/test10/remote-fence-unclean.scores         |   1 +
+ pengine/test10/remote-fence-unclean.summary        |   1 +
+ pengine/test10/remote-fence-unclean2.scores        |   1 +
+ pengine/test10/remote-fence-unclean2.summary       |   1 +
+ pengine/test10/remote-partial-migrate2.scores      |   1 +
+ pengine/test10/remote-partial-migrate2.summary     |   1 +
+ pengine/test10/remote-recover-all.scores           |   3 +
+ pengine/test10/remote-recover-all.summary          |   3 +
+ pengine/test10/remote-recover-connection.scores    |   1 +
+ pengine/test10/remote-recover-connection.summary   |   1 +
+ pengine/test10/remote-recover-fail.scores          |   1 +
+ pengine/test10/remote-recover-fail.summary         |   1 +
+ pengine/test10/remote-recover-no-resources.scores  |   2 +
+ pengine/test10/remote-recover-no-resources.summary |   2 +
+ pengine/test10/remote-recover-unknown.scores       |   3 +
+ pengine/test10/remote-recover-unknown.summary      |   3 +
+ pengine/test10/remote-recovery.scores              |   1 +
+ pengine/test10/remote-recovery.summary             |   1 +
+ pengine/test10/remote-unclean2.scores              |   1 +
+ pengine/test10/remote-unclean2.summary             |   1 +
+ pengine/test10/start-then-stop-with-unfence.dot    |   2 -
+ pengine/test10/start-then-stop-with-unfence.exp    |  16 +-
+ pengine/test10/start-then-stop-with-unfence.scores |   1 +
+ .../test10/start-then-stop-with-unfence.summary    |   9 +-
+ pengine/test10/start-then-stop-with-unfence.xml    |   1 +
+ pengine/test10/stonith-0.scores                    |   2 +
+ pengine/test10/stonith-0.summary                   |   2 +
+ pengine/test10/stonith-1.scores                    |   1 +
+ pengine/test10/stonith-1.summary                   |   1 +
+ pengine/test10/stonith-2.scores                    |   1 +
+ pengine/test10/stonith-2.summary                   |   1 +
+ pengine/test10/stonith-3.scores                    |   1 +
+ pengine/test10/stonith-3.summary                   |   1 +
+ pengine/test10/stonith-4.scores                    |   4 +
+ pengine/test10/stonith-4.summary                   |   4 +
+ pengine/test10/stop-failure-no-quorum.scores       |   1 +
+ pengine/test10/stop-failure-no-quorum.summary      |   1 +
+ pengine/test10/stop-failure-with-fencing.scores    |   1 +
+ pengine/test10/stop-failure-with-fencing.summary   |   1 +
+ pengine/test10/systemhealth1.scores                |   2 +
+ pengine/test10/systemhealth1.summary               |   2 +
+ pengine/test10/systemhealth2.scores                |   1 +
+ pengine/test10/systemhealth2.summary               |   1 +
+ pengine/test10/systemhealth3.scores                |   1 +
+ pengine/test10/systemhealth3.summary               |   1 +
+ pengine/test10/systemhealthm1.scores               |   2 +
+ pengine/test10/systemhealthm1.summary              |   2 +
+ pengine/test10/systemhealthm2.scores               |   1 +
+ pengine/test10/systemhealthm2.summary              |   1 +
+ pengine/test10/systemhealthm3.scores               |   1 +
+ pengine/test10/systemhealthm3.summary              |   1 +
+ pengine/test10/systemhealthn1.scores               |   2 +
+ pengine/test10/systemhealthn1.summary              |   2 +
+ pengine/test10/systemhealthn2.scores               |   1 +
+ pengine/test10/systemhealthn2.summary              |   1 +
+ pengine/test10/systemhealthn3.scores               |   1 +
+ pengine/test10/systemhealthn3.summary              |   1 +
+ pengine/test10/systemhealtho1.scores               |   2 +
+ pengine/test10/systemhealtho1.summary              |   2 +
+ pengine/test10/systemhealtho2.scores               |   1 +
+ pengine/test10/systemhealtho2.summary              |   1 +
+ pengine/test10/systemhealtho3.scores               |   1 +
+ pengine/test10/systemhealtho3.summary              |   1 +
+ pengine/test10/systemhealthp1.scores               |   2 +
+ pengine/test10/systemhealthp1.summary              |   2 +
+ pengine/test10/systemhealthp2.scores               |   1 +
+ pengine/test10/systemhealthp2.summary              |   1 +
+ pengine/test10/systemhealthp3.scores               |   1 +
+ pengine/test10/systemhealthp3.summary              |   1 +
+ pengine/test10/ticket-clone-21.scores              |   2 +
+ pengine/test10/ticket-clone-21.summary             |   2 +
+ pengine/test10/ticket-clone-9.scores               |   2 +
+ pengine/test10/ticket-clone-9.summary              |   2 +
+ pengine/test10/ticket-group-21.scores              |   1 +
+ pengine/test10/ticket-group-21.summary             |   1 +
+ pengine/test10/ticket-group-9.scores               |   1 +
+ pengine/test10/ticket-group-9.summary              |   1 +
+ pengine/test10/ticket-master-21.scores             |   1 +
+ pengine/test10/ticket-master-21.summary            |   1 +
+ pengine/test10/ticket-master-9.scores              |   1 +
+ pengine/test10/ticket-master-9.summary             |   1 +
+ pengine/test10/ticket-primitive-21.scores          |   1 +
+ pengine/test10/ticket-primitive-21.summary         |   1 +
+ pengine/test10/ticket-primitive-9.scores           |   1 +
+ pengine/test10/ticket-primitive-9.summary          |   1 +
+ pengine/test10/unfence-definition.dot              |   5 +-
+ pengine/test10/unfence-definition.exp              |  31 +--
+ pengine/test10/unfence-definition.scores           |   3 +
+ pengine/test10/unfence-definition.summary          |  13 +-
+ pengine/test10/unfence-definition.xml              |  10 +
+ pengine/test10/unfence-parameters.dot              |   7 +-
+ pengine/test10/unfence-parameters.exp              |  42 ++-
+ pengine/test10/unfence-parameters.scores           |   4 +
+ pengine/test10/unfence-parameters.summary          |  14 +-
+ pengine/test10/unfence-parameters.xml              |  10 +
+ pengine/test10/unfence-startup.dot                 |   5 +-
+ pengine/test10/unfence-startup.exp                 |  29 +-
+ pengine/test10/unfence-startup.scores              |   2 +
+ pengine/test10/unfence-startup.summary             |  10 +-
+ pengine/test10/unfence-startup.xml                 |  10 +
+ pengine/test10/whitebox-fail1.scores               |   1 +
+ pengine/test10/whitebox-fail1.summary              |   1 +
+ pengine/test10/whitebox-fail2.scores               |   1 +
+ pengine/test10/whitebox-fail2.summary              |   1 +
+ pengine/test10/whitebox-imply-stop-on-fence.scores |   3 +
+ .../test10/whitebox-imply-stop-on-fence.summary    |   3 +
+ pengine/test10/whitebox-ms-ordering.scores         |   2 +
+ pengine/test10/whitebox-ms-ordering.summary        |   2 +
+ .../test10/whitebox-unexpectedly-running.scores    |   1 +
+ .../test10/whitebox-unexpectedly-running.summary   |   1 +
+ 170 files changed, 582 insertions(+), 194 deletions(-)
+
+diff --git a/crmd/te_callbacks.c b/crmd/te_callbacks.c
+index 3c63aa6..b5c857d 100644
+--- a/crmd/te_callbacks.c
++++ b/crmd/te_callbacks.c
+@@ -788,16 +788,31 @@ tengine_stonith_callback(stonith_t * stonith, stonith_callback_data_t * data)
+     }
+ 
+     stop_te_timer(action->timer);
+-
+     if (rc == pcmk_ok) {
+         const char *target = crm_element_value(action->xml, XML_LRM_ATTR_TARGET);
+         const char *uuid = crm_element_value(action->xml, XML_LRM_ATTR_TARGET_UUID);
+         const char *op = crm_meta_value(action->params, "stonith_action"); 
+ 
+-        crm_debug("Stonith operation %d for %s passed", call_id, target);
++        crm_info("Stonith operation %d for %s passed", call_id, target);
+         if (action->confirmed == FALSE) {
+             te_action_confirmed(action);
+-            if (action->sent_update == FALSE && safe_str_neq("on", op)) {
++            if (safe_str_eq("on", op)) {
++                const char *key = NULL;
++                const char *value = NULL;
++
++                key = XML_NODE_IS_UNFENCED;
++                value = crm_meta_value(action->params, key);
++                update_attrd(target, key, value, NULL, FALSE);
++
++                key = "digests-all";
++                value = crm_meta_value(action->params, key);
++                update_attrd(target, key, value, NULL, FALSE);
++
++                key = "digests-secure";
++                value = crm_meta_value(action->params, key);
++                update_attrd(target, key, value, NULL, FALSE);
++
++            } else if (action->sent_update == FALSE) {
+                 send_stonith_update(action, target, uuid);
+                 action->sent_update = TRUE;
+             }
+diff --git a/include/crm/msg_xml.h b/include/crm/msg_xml.h
+index a764e1d..8cf22f3 100644
+--- a/include/crm/msg_xml.h
++++ b/include/crm/msg_xml.h
+@@ -262,6 +262,7 @@
+ #  define XML_NODE_IS_PEER    	"crmd"
+ #  define XML_NODE_IS_REMOTE    	"remote_node"
+ #  define XML_NODE_IS_FENCED		"node_fenced"
++#  define XML_NODE_IS_UNFENCED	    	"node_unfenced"
+ #  define XML_NODE_IS_MAINTENANCE   "node_in_maintenance"
+ 
+ #  define XML_CIB_ATTR_SHUTDOWN       	"shutdown"
+diff --git a/include/crm/pengine/internal.h b/include/crm/pengine/internal.h
+index 1b6afd1..3e10a30 100644
+--- a/include/crm/pengine/internal.h
++++ b/include/crm/pengine/internal.h
+@@ -273,7 +273,7 @@ typedef struct op_digest_cache_s {
+ op_digest_cache_t *rsc_action_digest_cmp(resource_t * rsc, xmlNode * xml_op, node_t * node,
+                                          pe_working_set_t * data_set);
+ 
+-action_t *pe_fence_op(node_t * node, const char *op, bool optional, pe_working_set_t * data_set);
++action_t *pe_fence_op(node_t * node, const char *op, bool optional, const char *reason, pe_working_set_t * data_set);
+ void trigger_unfencing(
+     resource_t * rsc, node_t *node, const char *reason, action_t *dependency, pe_working_set_t * data_set);
+ 
+diff --git a/lib/pengine/utils.c b/lib/pengine/utils.c
+index bbda521..0c00a7b 100644
+--- a/lib/pengine/utils.c
++++ b/lib/pengine/utils.c
+@@ -1916,7 +1916,7 @@ filter_parameters(xmlNode * param_set, const char *param_string, bool need_prese
+         return;
+     }
+ 
+-    if (param_set) {
++    if (param_set && param_string) {
+         xmlAttrPtr xIter = param_set->properties;
+ 
+         while (xIter) {
+@@ -1982,107 +1982,155 @@ bool fix_remote_addr(resource_t * rsc)
+     return TRUE;
+ }
+ 
+-op_digest_cache_t *
+-rsc_action_digest_cmp(resource_t * rsc, xmlNode * xml_op, node_t * node,
+-                      pe_working_set_t * data_set)
++static op_digest_cache_t *
++rsc_action_digest(resource_t * rsc, const char *task, const char *key,
++                  node_t * node, xmlNode * xml_op, pe_working_set_t * data_set) 
+ {
+     op_digest_cache_t *data = NULL;
+ 
+-    GHashTable *local_rsc_params = NULL;
++    data = g_hash_table_lookup(node->details->digest_cache, key);
++    if (data == NULL) {
++        GHashTable *local_rsc_params = g_hash_table_new_full(crm_str_hash, g_str_equal, free, free);
++        action_t *action = custom_action(rsc, strdup(key), task, node, TRUE, FALSE, data_set);
+ 
+-    action_t *action = NULL;
+-    char *key = NULL;
++        const char *op_version;
++        const char *restart_list = NULL;
++        const char *secure_list = " passwd password ";
+ 
+-    int interval = 0;
+-    const char *op_id = ID(xml_op);
+-    const char *interval_s = crm_element_value(xml_op, XML_LRM_ATTR_INTERVAL);
+-    const char *task = crm_element_value(xml_op, XML_LRM_ATTR_TASK);
+-    const char *digest_all;
+-    const char *digest_restart;
+-    const char *secure_list;
+-    const char *restart_list;
+-    const char *op_version;
++        data = calloc(1, sizeof(op_digest_cache_t));
++        CRM_ASSERT(data != NULL);
+ 
+-    CRM_ASSERT(node != NULL);
++        get_rsc_attributes(local_rsc_params, rsc, node, data_set);
+ 
+-    data = g_hash_table_lookup(node->details->digest_cache, op_id);
+-    if (data) {
+-        return data;
+-    }
++        data->params_all = create_xml_node(NULL, XML_TAG_PARAMS);
++        if (fix_remote_addr(rsc)) {
++            // REMOTE_CONTAINER_HACK: Allow remote nodes that start containers with pacemaker remote inside
++            crm_xml_add(data->params_all, "addr", node->details->uname);
++            crm_trace("Fixing addr for %s on %s", rsc->id, node->details->uname);
++        }
+ 
+-    data = calloc(1, sizeof(op_digest_cache_t));
+-    CRM_ASSERT(data != NULL);
++        g_hash_table_foreach(local_rsc_params, hash2field, data->params_all);
++        g_hash_table_foreach(action->extra, hash2field, data->params_all);
++        g_hash_table_foreach(rsc->parameters, hash2field, data->params_all);
++        g_hash_table_foreach(action->meta, hash2metafield, data->params_all);
+ 
+-    digest_all = crm_element_value(xml_op, XML_LRM_ATTR_OP_DIGEST);
+-    digest_restart = crm_element_value(xml_op, XML_LRM_ATTR_RESTART_DIGEST);
++        if(xml_op) {
++            secure_list = crm_element_value(xml_op, XML_LRM_ATTR_OP_SECURE);
++            restart_list = crm_element_value(xml_op, XML_LRM_ATTR_OP_RESTART);
+ 
+-    secure_list = crm_element_value(xml_op, XML_LRM_ATTR_OP_SECURE);
+-    restart_list = crm_element_value(xml_op, XML_LRM_ATTR_OP_RESTART);
++            op_version = crm_element_value(xml_op, XML_ATTR_CRM_VERSION);
+ 
+-    op_version = crm_element_value(xml_op, XML_ATTR_CRM_VERSION);
++        } else {
++            op_version = CRM_FEATURE_SET;
++        }
+ 
+-    /* key is freed in custom_action */
+-    interval = crm_parse_int(interval_s, "0");
+-    key = generate_op_key(rsc->id, task, interval);
+-    action = custom_action(rsc, key, task, node, TRUE, FALSE, data_set);
+-    key = NULL;
++        filter_action_parameters(data->params_all, op_version);
+ 
+-    local_rsc_params = g_hash_table_new_full(crm_str_hash, g_str_equal,
+-                                             g_hash_destroy_str, g_hash_destroy_str);
+-    get_rsc_attributes(local_rsc_params, rsc, node, data_set);
+-    data->params_all = create_xml_node(NULL, XML_TAG_PARAMS);
++        g_hash_table_destroy(local_rsc_params);
++        pe_free_action(action);
+ 
+-    if (fix_remote_addr(rsc)) {
+-        // REMOTE_CONTAINER_HACK: Allow remote nodes that start containers with pacemaker remote inside
+-        crm_xml_add(data->params_all, "addr", node->details->uname);
+-        crm_trace("Fixing addr for %s on %s", rsc->id, node->details->uname);
++        data->digest_all_calc = calculate_operation_digest(data->params_all, op_version);
++
++        if (is_set(data_set->flags, pe_flag_sanitized)) {
++            data->params_secure = copy_xml(data->params_all);
++            if(secure_list) {
++                filter_parameters(data->params_secure, secure_list, FALSE);
++            }
++            data->digest_secure_calc = calculate_operation_digest(data->params_secure, op_version);
++        }
++
++        if(xml_op && crm_element_value(xml_op, XML_LRM_ATTR_RESTART_DIGEST) != NULL) {
++            data->params_restart = copy_xml(data->params_all);
++            if (restart_list) {
++                filter_parameters(data->params_restart, restart_list, TRUE);
++            }
++            data->digest_restart_calc = calculate_operation_digest(data->params_restart, op_version);
++        }
++
++        g_hash_table_insert(node->details->digest_cache, strdup(key), data);
+     }
+ 
+-    g_hash_table_foreach(local_rsc_params, hash2field, data->params_all);
+-    g_hash_table_foreach(action->extra, hash2field, data->params_all);
+-    g_hash_table_foreach(rsc->parameters, hash2field, data->params_all);
+-    g_hash_table_foreach(action->meta, hash2metafield, data->params_all);
+-    filter_action_parameters(data->params_all, op_version);
++    return data;
++}
+ 
+-    data->digest_all_calc = calculate_operation_digest(data->params_all, op_version);
++op_digest_cache_t *
++rsc_action_digest_cmp(resource_t * rsc, xmlNode * xml_op, node_t * node,
++                      pe_working_set_t * data_set)
++{
++    op_digest_cache_t *data = NULL;
+ 
+-    if (secure_list && is_set(data_set->flags, pe_flag_sanitized)) {
+-        data->params_secure = copy_xml(data->params_all);
++    char *key = NULL;
++    int interval = 0;
++    const char *interval_s = crm_element_value(xml_op, XML_LRM_ATTR_INTERVAL);
++    const char *task = crm_element_value(xml_op, XML_LRM_ATTR_TASK);
++    const char *digest_all;
++    const char *digest_restart;
+ 
+-        if (secure_list) {
+-            filter_parameters(data->params_secure, secure_list, FALSE);
+-        }
+-        data->digest_secure_calc = calculate_operation_digest(data->params_secure, op_version);
+-    }
++    CRM_ASSERT(node != NULL);
+ 
+-    if (digest_restart) {
+-        data->params_restart = copy_xml(data->params_all);
++    digest_all = crm_element_value(xml_op, XML_LRM_ATTR_OP_DIGEST);
++    digest_restart = crm_element_value(xml_op, XML_LRM_ATTR_RESTART_DIGEST);
+ 
+-        if (restart_list) {
+-            filter_parameters(data->params_restart, restart_list, TRUE);
+-        }
+-        data->digest_restart_calc = calculate_operation_digest(data->params_restart, op_version);
+-    }
++    interval = crm_parse_int(interval_s, "0");
++    key = generate_op_key(rsc->id, task, interval);
++    data = rsc_action_digest(rsc, task, key, node, xml_op, data_set);
+ 
+     data->rc = RSC_DIGEST_MATCH;
+-    if (digest_restart && strcmp(data->digest_restart_calc, digest_restart) != 0) {
++    if (digest_restart && data->digest_restart_calc && strcmp(data->digest_restart_calc, digest_restart) != 0) {
+         data->rc = RSC_DIGEST_RESTART;
+ 
+     } else if (digest_all == NULL) {
+         /* it is unknown what the previous op digest was */
+         data->rc = RSC_DIGEST_UNKNOWN;
+-
+     } else if (strcmp(digest_all, data->digest_all_calc) != 0) {
+         data->rc = RSC_DIGEST_ALL;
+     }
++ 
++    free(key);
++    return data;
++}
+ 
+-    g_hash_table_insert(node->details->digest_cache, strdup(op_id), data);
+-    g_hash_table_destroy(local_rsc_params);
+-    pe_free_action(action);
++#define STONITH_DIGEST_TASK "stonith-on"
+ 
++static op_digest_cache_t *
++fencing_action_digest_cmp(resource_t * rsc, node_t * node, pe_working_set_t * data_set)
++{
++    char *key = generate_op_key(rsc->id, STONITH_DIGEST_TASK, 0);
++    op_digest_cache_t *data = rsc_action_digest(rsc, STONITH_DIGEST_TASK, key, node, NULL, data_set);
++ 
++    const char *digest_all = g_hash_table_lookup(node->details->attrs, "digests-all");
++    const char *digest_secure = g_hash_table_lookup(node->details->attrs, "digests-secure");
++ 
++    /* No restarts for fencing device changes */
++ 
++    data->rc = RSC_DIGEST_ALL;
++    if (digest_all == NULL) {
++         /* it is unknown what the previous op digest was */
++         data->rc = RSC_DIGEST_UNKNOWN;
++ 
++    } else if (strcmp(digest_all, data->digest_all_calc) == 0) {
++        data->rc = RSC_DIGEST_MATCH;
++
++    } else if(digest_secure && data->digest_secure_calc) {
++        char *search = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
++
++        if(strstr(digest_secure, search)) {
++            fprintf(stdout, "Only 'private' parameters to %s for unfencing %s changed\n",
++                    rsc->id, node->details->uname);
++            data->rc = RSC_DIGEST_MATCH;
++        }
++    }
++ 
++    if (data->rc == RSC_DIGEST_ALL && is_set(data_set->flags, pe_flag_sanitized) && data->digest_secure_calc) {
++        fprintf(stdout, "Parameters to %s for unfencing %s changed, try '%s:%s:%s'\n",
++                rsc->id, node->details->uname, rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
++    }
++ 
++    free(key);
+     return data;
+ }
+ 
++
+ const char *rsc_printable_id(resource_t *rsc)
+ {
+     if (is_not_set(rsc->flags, pe_rsc_unique)) {
+@@ -2117,30 +2165,94 @@ set_bit_recursive(resource_t * rsc, unsigned long long flag)
+     }
+ }
+ 
++static GListPtr
++find_unfencing_devices(GListPtr candidates, GListPtr matches) 
++{
++    for (GListPtr gIter = candidates; gIter != NULL; gIter = gIter->next) {
++        resource_t *candidate = gIter->data;
++        const char *provides = g_hash_table_lookup(candidate->meta, XML_RSC_ATTR_PROVIDES);
++        const char *requires = g_hash_table_lookup(candidate->meta, XML_RSC_ATTR_REQUIRES);
++
++        if(candidate->children) {
++            matches = find_unfencing_devices(candidate->children, matches);
++        } else if (is_not_set(candidate->flags, pe_rsc_fence_device)) {
++            continue;
++
++        } else if (crm_str_eq(provides, "unfencing", FALSE) || crm_str_eq(requires, "unfencing", FALSE)) {
++            matches = g_list_prepend(matches, candidate);
++        }
++    }
++    return matches;
++}
++
+ action_t *
+-pe_fence_op(node_t * node, const char *op, bool optional, pe_working_set_t * data_set)
++pe_fence_op(node_t * node, const char *op, bool optional, const char *reason, pe_working_set_t * data_set)
+ {
+-    char *key = NULL;
++    char *op_key = NULL;
+     action_t *stonith_op = NULL;
+ 
+     if(op == NULL) {
+         op = data_set->stonith_action;
+     }
+ 
+-    key = crm_strdup_printf("%s-%s-%s", CRM_OP_FENCE, node->details->uname, op);
++    op_key = crm_strdup_printf("%s-%s-%s", CRM_OP_FENCE, node->details->uname, op);
+ 
+     if(data_set->singletons) {
+-        stonith_op = g_hash_table_lookup(data_set->singletons, key);
++        stonith_op = g_hash_table_lookup(data_set->singletons, op_key);
+     }
+ 
+     if(stonith_op == NULL) {
+-        stonith_op = custom_action(NULL, key, CRM_OP_FENCE, node, optional, TRUE, data_set);
++        stonith_op = custom_action(NULL, op_key, CRM_OP_FENCE, node, optional, TRUE, data_set);
+ 
+         add_hash_param(stonith_op->meta, XML_LRM_ATTR_TARGET, node->details->uname);
+         add_hash_param(stonith_op->meta, XML_LRM_ATTR_TARGET_UUID, node->details->id);
+         add_hash_param(stonith_op->meta, "stonith_action", op);
++
++        if(is_remote_node(node) && is_set(data_set->flags, pe_flag_enable_unfencing)) {
++            /* Extra work to detect device changes on remotes
++             *
++             * We may do this for all nodes in the future, but for now
++             * the check_action_definition() based stuff works fine.
++             *
++             * Use "stonith-on" to avoid creating cache entries for
++             * operations check_action_definition() would look for.
++             */
++            long max = 1024;
++            long digests_all_offset = 0;
++            long digests_secure_offset = 0;
++
++            char *digests_all = malloc(max);
++            char *digests_secure = malloc(max);
++            GListPtr matches = find_unfencing_devices(data_set->resources, NULL);
++
++            for (GListPtr gIter = matches; gIter != NULL; gIter = gIter->next) {
++                resource_t *match = gIter->data;
++                op_digest_cache_t *data = fencing_action_digest_cmp(match, node, data_set);
++
++                if(data->rc == RSC_DIGEST_ALL) {
++                    optional = FALSE;
++                    crm_notice("Unfencing %s (remote): because the definition of %s changed", node->details->uname, match->id);
++                    if (is_set(data_set->flags, pe_flag_sanitized)) {
++                        /* Extra detail for those running from the commandline */
++                        fprintf(stdout, "  notice: Unfencing %s (remote): because the definition of %s changed\n", node->details->uname, match->id);
++                    }
++
++                }
++
++                digests_all_offset += snprintf(
++                    digests_all+digests_all_offset, max-digests_all_offset,
++                    "%s:%s:%s,", match->id, (const char*)g_hash_table_lookup(match->meta, XML_ATTR_TYPE), data->digest_all_calc);
++
++                digests_secure_offset += snprintf(
++                    digests_secure+digests_secure_offset, max-digests_secure_offset,
++                    "%s:%s:%s,", match->id, (const char*)g_hash_table_lookup(match->meta, XML_ATTR_TYPE), data->digest_secure_calc);
++            }
++            add_hash_param(stonith_op->meta, strdup("digests-all"), digests_all);
++            add_hash_param(stonith_op->meta, strdup("digests-secure"), digests_secure);
++        }
++
+     } else {
+-        free(key);
++        free(op_key);
+     }
+ 
+     if(optional == FALSE) {
+@@ -2167,9 +2279,8 @@ trigger_unfencing(
+               && node->details->online
+               && node->details->unclean == FALSE
+               && node->details->shutdown == FALSE) {
+-        action_t *unfence = pe_fence_op(node, "on", FALSE, data_set);
++        action_t *unfence = pe_fence_op(node, "on", FALSE, reason, data_set);
+ 
+-        crm_notice("Unfencing %s: %s", node->details->uname, reason);
+         if(dependency) {
+             order_actions(unfence, dependency, pe_order_optional);
+         }
+diff --git a/pengine/allocate.c b/pengine/allocate.c
+index 8ea2ea1..fd9c4f9 100644
+--- a/pengine/allocate.c
++++ b/pengine/allocate.c
+@@ -1406,7 +1406,7 @@ fence_guest(pe_node_t *node, pe_action_t *done, pe_working_set_t *data_set)
+     /* Create a fence pseudo-event, so we have an event to order actions
+      * against, and crmd can always detect it.
+      */
+-    stonith_op = pe_fence_op(node, fence_action, FALSE, data_set);
++    stonith_op = pe_fence_op(node, fence_action, FALSE, "guest is unclean", data_set);
+     update_action_flags(stonith_op, pe_action_pseudo | pe_action_runnable,
+                         __FUNCTION__, __LINE__);
+ 
+@@ -1488,7 +1488,7 @@ stage6(pe_working_set_t * data_set)
+ 
+             pe_warn("Scheduling Node %s for STONITH", node->details->uname);
+ 
+-            stonith_op = pe_fence_op(node, NULL, FALSE, data_set);
++            stonith_op = pe_fence_op(node, NULL, FALSE, "node is unclean", data_set);
+ 
+             stonith_constraints(node, stonith_op, data_set);
+ 
+diff --git a/pengine/native.c b/pengine/native.c
+index dd5ff18..bc59405 100644
+--- a/pengine/native.c
++++ b/pengine/native.c
+@@ -1355,7 +1355,7 @@ native_internal_constraints(resource_t * rsc, pe_working_set_t * data_set)
+ 
+         g_hash_table_iter_init(&iter, rsc->allowed_nodes);
+         while (g_hash_table_iter_next(&iter, NULL, (void **)&node)) {
+-            action_t *unfence = pe_fence_op(node, "on", TRUE, data_set);
++            action_t *unfence = pe_fence_op(node, "on", TRUE, __FUNCTION__, data_set);
+ 
+             crm_debug("Ordering any stops of %s before %s, and any starts after",
+                       rsc->id, unfence->uuid);
+@@ -2455,6 +2455,16 @@ StopRsc(resource_t * rsc, node_t * next, gboolean optional, pe_working_set_t * d
+         if (is_set(data_set->flags, pe_flag_remove_after_stop)) {
+             DeleteRsc(rsc, current, optional, data_set);
+         }
++
++        if(is_set(rsc->flags, pe_rsc_needs_unfencing)) {
++            action_t *unfence = pe_fence_op(current, "on", TRUE, __FUNCTION__, data_set);
++            const char *unfenced = g_hash_table_lookup(current->details->attrs, XML_NODE_IS_UNFENCED);
++
++            order_actions(stop, unfence, pe_order_implies_first);
++            if (unfenced == NULL || safe_str_eq("0", unfenced)) {
++                pe_proc_err("Stopping %s until %s can be unfenced", rsc->id, current->details->uname);
++            }
++        }
+     }
+ 
+     return TRUE;
+@@ -2468,9 +2478,25 @@ StartRsc(resource_t * rsc, node_t * next, gboolean optional, pe_working_set_t *
+     CRM_ASSERT(rsc);
+     pe_rsc_trace(rsc, "%s on %s %d", rsc->id, next ? next->details->uname : "N/A", optional);
+     start = start_action(rsc, next, TRUE);
++
++    if(is_set(rsc->flags, pe_rsc_needs_unfencing)) {
++        action_t *unfence = pe_fence_op(next, "on", TRUE, __FUNCTION__, data_set);
++        const char *unfenced = g_hash_table_lookup(next->details->attrs, XML_NODE_IS_UNFENCED);
++
++        order_actions(unfence, start, pe_order_implies_then);
++
++        if (unfenced == NULL || safe_str_eq("0", unfenced)) {
++            char *reason = crm_strdup_printf("Required by %s", rsc->id);
++            trigger_unfencing(NULL, next, reason, NULL, data_set);
++            free(reason);
++        }
++    }
++
+     if (is_set(start->flags, pe_action_runnable) && optional == FALSE) {
+         update_action_flags(start, pe_action_optional | pe_action_clear, __FUNCTION__, __LINE__);
+     }
++
++
+     return TRUE;
+ }
+ 
+@@ -2820,14 +2846,9 @@ native_create_probe(resource_t * rsc, node_t * node, action_t * complete,
+      * probed, we know the state of all resources that require
+      * unfencing and that unfencing occurred.
+      */
+-    if(is_set(rsc->flags, pe_rsc_fence_device) && is_set(data_set->flags, pe_flag_enable_unfencing)) {
+-        trigger_unfencing(NULL, node, "node discovery", probe, data_set);
+-        probe->priority = INFINITY; /* Ensure this runs if unfencing succeeds */
+-
+-    } else if(is_set(rsc->flags, pe_rsc_needs_unfencing)) {
+-        action_t *unfence = pe_fence_op(node, "on", TRUE, data_set);
+-
+-        order_actions(probe, unfence, pe_order_optional);
++    if(is_set(rsc->flags, pe_rsc_needs_unfencing)) {
++        action_t *unfence = pe_fence_op(node, "on", TRUE, __FUNCTION__, data_set);
++        order_actions(unfence, probe, pe_order_optional);
+     }
+ 
+     /*
+diff --git a/pengine/test10/594.scores b/pengine/test10/594.scores
+index 972b89b..430550c 100644
+--- a/pengine/test10/594.scores
++++ b/pengine/test10/594.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hadev3: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on hadev1: 0
+ clone_color: DoFencing allocation score on hadev2: 0
+diff --git a/pengine/test10/594.summary b/pengine/test10/594.summary
+index ef2a02c..6cd78d3 100644
+--- a/pengine/test10/594.summary
++++ b/pengine/test10/594.summary
+@@ -12,6 +12,7 @@ Online: [ hadev1 hadev2 ]
+      child_DoFencing:1	(stonith:ssh):	Started hadev1
+      child_DoFencing:2	(stonith:ssh):	Started hadev1
+ 
++  notice: Fencing   hadev3: node is unclean
+ Transition Summary:
+  * Fence (reboot) hadev3
+  * Shutdown hadev2
+diff --git a/pengine/test10/829.scores b/pengine/test10/829.scores
+index f0652ff..71a372b 100644
+--- a/pengine/test10/829.scores
++++ b/pengine/test10/829.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c001n02: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n01: 0
+ clone_color: DoFencing allocation score on c001n02: 0
+diff --git a/pengine/test10/829.summary b/pengine/test10/829.summary
+index 556699f..8649ed8 100644
+--- a/pengine/test10/829.summary
++++ b/pengine/test10/829.summary
+@@ -14,6 +14,7 @@ Online: [ c001n01 c001n03 c001n08 ]
+      child_DoFencing:2	(stonith:ssh):	Started c001n01
+      child_DoFencing:3	(stonith:ssh):	Started c001n08
+ 
++  notice: Fencing   c001n02: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n02
+  * Move    rsc_c001n02	(Started c001n02 -> c001n01)
+diff --git a/pengine/test10/bug-5186-partial-migrate.scores b/pengine/test10/bug-5186-partial-migrate.scores
+index 8b29529..dd59f34 100644
+--- a/pengine/test10/bug-5186-partial-migrate.scores
++++ b/pengine/test10/bug-5186-partial-migrate.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   bl460g1n7: node is unclean
+ Allocation scores:
+ clone_color: clnDiskd1 allocation score on bl460g1n6: 200
+ clone_color: clnDiskd1 allocation score on bl460g1n7: 0
+diff --git a/pengine/test10/bug-5186-partial-migrate.summary b/pengine/test10/bug-5186-partial-migrate.summary
+index a32e81d..5c8231d 100644
+--- a/pengine/test10/bug-5186-partial-migrate.summary
++++ b/pengine/test10/bug-5186-partial-migrate.summary
+@@ -24,6 +24,7 @@ Online: [ bl460g1n6 bl460g1n8 ]
+      prmPing	(ocf::pacemaker:ping):	Started bl460g1n7 (UNCLEAN)
+      Started: [ bl460g1n6 bl460g1n8 ]
+ 
++  notice: Fencing   bl460g1n7: node is unclean
+ Transition Summary:
+  * Fence (reboot) bl460g1n7
+  * Move    prmDummy	(Started bl460g1n7 -> bl460g1n6)
+diff --git a/pengine/test10/bug-cl-5247.scores b/pengine/test10/bug-cl-5247.scores
+index e9e4709..f1ded69 100644
+--- a/pengine/test10/bug-cl-5247.scores
++++ b/pengine/test10/bug-cl-5247.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   pgsr02: guest is unclean
+ Allocation scores:
+ Using the original execution date of: 2015-08-12 02:53:40Z
+ clone_color: msPostgresql allocation score on bl460g8n3: -INFINITY
+diff --git a/pengine/test10/bug-cl-5247.summary b/pengine/test10/bug-cl-5247.summary
+index f70a9ea..755e647 100644
+--- a/pengine/test10/bug-cl-5247.summary
++++ b/pengine/test10/bug-cl-5247.summary
+@@ -17,6 +17,7 @@ Containers: [ pgsr01:prmDB1 ]
+      Masters: [ pgsr01 ]
+      Stopped: [ bl460g8n3 bl460g8n4 ]
+ 
++  notice: Fencing   pgsr02: guest is unclean
+ Transition Summary:
+  * Fence (off) pgsr02 (resource: prmDB2)
+  * Stop    prmDB2	(bl460g8n4)
+diff --git a/pengine/test10/bug-lf-2508.scores b/pengine/test10/bug-lf-2508.scores
+index 3c3ce16..200d548 100644
+--- a/pengine/test10/bug-lf-2508.scores
++++ b/pengine/test10/bug-lf-2508.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   srv02: node is unclean
+ Allocation scores:
+ clone_color: clnStonith1 allocation score on srv01: -INFINITY
+ clone_color: clnStonith1 allocation score on srv02: 0
+diff --git a/pengine/test10/bug-lf-2508.summary b/pengine/test10/bug-lf-2508.summary
+index 7931d19..18080cb 100644
+--- a/pengine/test10/bug-lf-2508.summary
++++ b/pengine/test10/bug-lf-2508.summary
+@@ -34,6 +34,7 @@ Online: [ srv01 srv03 srv04 ]
+      Started: [ srv01 srv03 ]
+      Stopped: [ srv04 ]
+ 
++  notice: Fencing   srv02: node is unclean
+ Transition Summary:
+  * Fence (reboot) srv02
+  * Start   Dummy01	(srv01)
+diff --git a/pengine/test10/bug-lf-2551.scores b/pengine/test10/bug-lf-2551.scores
+index 2b0aa12..64cbca0 100644
+--- a/pengine/test10/bug-lf-2551.scores
++++ b/pengine/test10/bug-lf-2551.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hex-9: node is unclean
+ Allocation scores:
+ clone_color: base-clone allocation score on hex-0: 14
+ clone_color: base-clone allocation score on hex-7: 16
+diff --git a/pengine/test10/bug-lf-2551.summary b/pengine/test10/bug-lf-2551.summary
+index ef2e54a..4fa553c 100644
+--- a/pengine/test10/bug-lf-2551.summary
++++ b/pengine/test10/bug-lf-2551.summary
+@@ -80,6 +80,7 @@ Online: [ hex-0 hex-7 hex-8 ]
+  vm-63	(ocf::heartbeat:Xen):	Stopped 
+  vm-64	(ocf::heartbeat:Xen):	Stopped 
+ 
++  notice: Fencing   hex-9: node is unclean
+ Transition Summary:
+  * Fence (reboot) hex-9
+  * Move    fencing-sbd	(Started hex-9 -> hex-0)
+diff --git a/pengine/test10/bug-lf-2606.scores b/pengine/test10/bug-lf-2606.scores
+index 6a9d522..b1e6a02 100644
+--- a/pengine/test10/bug-lf-2606.scores
++++ b/pengine/test10/bug-lf-2606.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ clone_color: ms3 allocation score on node1: 0
+ clone_color: ms3 allocation score on node2: 0
+diff --git a/pengine/test10/bug-lf-2606.summary b/pengine/test10/bug-lf-2606.summary
+index f30a053..e6cfa89 100644
+--- a/pengine/test10/bug-lf-2606.summary
++++ b/pengine/test10/bug-lf-2606.summary
+@@ -11,6 +11,7 @@ Online: [ node1 ]
+      Masters: [ node2 ]
+      Slaves: [ node1 ]
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+diff --git a/pengine/test10/bug-rh-1097457.scores b/pengine/test10/bug-rh-1097457.scores
+index 7729421..2fe2859 100644
+--- a/pengine/test10/bug-rh-1097457.scores
++++ b/pengine/test10/bug-rh-1097457.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   lamaVM2: guest is unclean
+ Allocation scores:
+ clone_color: FAKE6-clone allocation score on lama2: -INFINITY
+ clone_color: FAKE6-clone allocation score on lama3: -INFINITY
+diff --git a/pengine/test10/bug-rh-1097457.summary b/pengine/test10/bug-rh-1097457.summary
+index 1c355c0..19aa39d 100644
+--- a/pengine/test10/bug-rh-1097457.summary
++++ b/pengine/test10/bug-rh-1097457.summary
+@@ -31,6 +31,7 @@ Containers: [ lamaVM1:VM1 lamaVM2:VM2 lamaVM3:VM3 ]
+  Clone Set: FAKE6-clone [FAKE6]
+      Started: [ lamaVM1 lamaVM2 lamaVM3 ]
+ 
++  notice: Fencing   lamaVM2: guest is unclean
+ Transition Summary:
+  * Fence (reboot) lamaVM2 (resource: VM2)
+  * Recover VM2	(Started lama3)
+diff --git a/pengine/test10/concurrent-fencing.scores b/pengine/test10/concurrent-fencing.scores
+index 0322231..1be723e 100644
+--- a/pengine/test10/concurrent-fencing.scores
++++ b/pengine/test10/concurrent-fencing.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
++  notice: Fencing   node3: node is unclean
+ Allocation scores:
+ native_color: lsb_dummy allocation score on node1: 0
+ native_color: lsb_dummy allocation score on node2: 0
+diff --git a/pengine/test10/concurrent-fencing.summary b/pengine/test10/concurrent-fencing.summary
+index 1e4a817..3f54c2c 100644
+--- a/pengine/test10/concurrent-fencing.summary
++++ b/pengine/test10/concurrent-fencing.summary
+@@ -7,6 +7,9 @@ Node node3 (uuid3): UNCLEAN (offline)
+  stonith-1	(stonith:dummy):	Stopped
+  lsb_dummy	(lsb:/usr/lib/heartbeat/cts/LSBDummy):	Stopped
+ 
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
++  notice: Fencing   node3: node is unclean
+ Transition Summary:
+  * Fence (reboot) node3
+  * Fence (reboot) node2
+diff --git a/pengine/test10/guest-node-host-dies.scores b/pengine/test10/guest-node-host-dies.scores
+index 0d7ad3f..663d236 100644
+--- a/pengine/test10/guest-node-host-dies.scores
++++ b/pengine/test10/guest-node-host-dies.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   lxc1: guest is unclean
++  notice: Fencing   lxc2: guest is unclean
++  notice: Fencing   rhel7-1: node is unclean
+ Allocation scores:
+ clone_color: lxc-ms-master allocation score on lxc1: INFINITY
+ clone_color: lxc-ms-master allocation score on lxc2: INFINITY
+diff --git a/pengine/test10/guest-node-host-dies.summary b/pengine/test10/guest-node-host-dies.summary
+index 9f85613..679deb6 100644
+--- a/pengine/test10/guest-node-host-dies.summary
++++ b/pengine/test10/guest-node-host-dies.summary
+@@ -10,6 +10,9 @@ Online: [ rhel7-2 rhel7-3 rhel7-4 rhel7-5 ]
+  Master/Slave Set: lxc-ms-master [lxc-ms]
+      Stopped: [ rhel7-1 rhel7-2 rhel7-3 rhel7-4 rhel7-5 ]
+ 
++  notice: Fencing   lxc1: guest is unclean
++  notice: Fencing   lxc2: guest is unclean
++  notice: Fencing   rhel7-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) rhel7-1
+  * Fence (reboot) lxc2 (resource: container2)
+diff --git a/pengine/test10/interleave-pseudo-stop.scores b/pengine/test10/interleave-pseudo-stop.scores
+index 014f4de..625ba18 100644
+--- a/pengine/test10/interleave-pseudo-stop.scores
++++ b/pengine/test10/interleave-pseudo-stop.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ clone_color: configstoreclone:0 allocation score on node1: 0
+ clone_color: configstoreclone:0 allocation score on node2: 1
+diff --git a/pengine/test10/interleave-pseudo-stop.summary b/pengine/test10/interleave-pseudo-stop.summary
+index 12be956..8c22b2f 100644
+--- a/pengine/test10/interleave-pseudo-stop.summary
++++ b/pengine/test10/interleave-pseudo-stop.summary
+@@ -16,6 +16,7 @@ Online: [ node2 ]
+      configstoreclone	(ocf::heartbeat:Filesystem):	Started node1 (UNCLEAN)
+      Started: [ node2 ]
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Stop    stonithclone:1	(node1)
+diff --git a/pengine/test10/master-7.scores b/pengine/test10/master-7.scores
+index 37fc6cd..7569625 100644
+--- a/pengine/test10/master-7.scores
++++ b/pengine/test10/master-7.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c001n01: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n01: 0
+ clone_color: DoFencing allocation score on c001n02: 0
+diff --git a/pengine/test10/master-7.summary b/pengine/test10/master-7.summary
+index 2889efb..d76051e 100644
+--- a/pengine/test10/master-7.summary
++++ b/pengine/test10/master-7.summary
+@@ -28,6 +28,7 @@ Online: [ c001n02 c001n03 c001n08 ]
+      ocf_msdummy:6	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n02 
+      ocf_msdummy:7	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n08 
+ 
++  notice: Fencing   c001n01: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n01
+  * Move    DcIPaddr	(Started c001n01 -> c001n03)
+diff --git a/pengine/test10/master-8.scores b/pengine/test10/master-8.scores
+index c9d1cc9..880d7fb 100644
+--- a/pengine/test10/master-8.scores
++++ b/pengine/test10/master-8.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c001n01: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n01: 0
+ clone_color: DoFencing allocation score on c001n02: 0
+diff --git a/pengine/test10/master-8.summary b/pengine/test10/master-8.summary
+index 5968a25..7d0b840 100644
+--- a/pengine/test10/master-8.summary
++++ b/pengine/test10/master-8.summary
+@@ -28,6 +28,7 @@ Online: [ c001n02 c001n03 c001n08 ]
+      ocf_msdummy:6	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n02 
+      ocf_msdummy:7	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n08 
+ 
++  notice: Fencing   c001n01: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n01
+  * Move    DcIPaddr	(Started c001n01 -> c001n03)
+diff --git a/pengine/test10/migrate-fencing.scores b/pengine/test10/migrate-fencing.scores
+index 3febd69..37d42b4 100644
+--- a/pengine/test10/migrate-fencing.scores
++++ b/pengine/test10/migrate-fencing.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   pcmk-4: node is unclean
+ Allocation scores:
+ clone_color: Connectivity allocation score on pcmk-1: 0
+ clone_color: Connectivity allocation score on pcmk-2: 0
+diff --git a/pengine/test10/migrate-fencing.summary b/pengine/test10/migrate-fencing.summary
+index 842c65d..fdb905e 100644
+--- a/pengine/test10/migrate-fencing.summary
++++ b/pengine/test10/migrate-fencing.summary
+@@ -21,6 +21,7 @@ Online: [ pcmk-1 pcmk-2 pcmk-3 ]
+      Masters: [ pcmk-4 ]
+      Slaves: [ pcmk-1 pcmk-2 pcmk-3 ]
+ 
++  notice: Fencing   pcmk-4: node is unclean
+ Transition Summary:
+  * Fence (reboot) pcmk-4
+  * Stop    FencingChild:0	(pcmk-4)
+diff --git a/pengine/test10/rec-node-11.scores b/pengine/test10/rec-node-11.scores
+index 482deeb..86c2bf5 100644
+--- a/pengine/test10/rec-node-11.scores
++++ b/pengine/test10/rec-node-11.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ group_color: group1 allocation score on node1: 0
+ group_color: group1 allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-11.summary b/pengine/test10/rec-node-11.summary
+index 22f5af7..f45f0a8 100644
+--- a/pengine/test10/rec-node-11.summary
++++ b/pengine/test10/rec-node-11.summary
+@@ -9,6 +9,7 @@ Online: [ node2 ]
+      rsc2	(heartbeat:apache):	Started node1
+  rsc3	(heartbeat:apache):	Started node2
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+diff --git a/pengine/test10/rec-node-12.scores b/pengine/test10/rec-node-12.scores
+index 153c232..4fd9ff5 100644
+--- a/pengine/test10/rec-node-12.scores
++++ b/pengine/test10/rec-node-12.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c001n02: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n01: 0
+ clone_color: DoFencing allocation score on c001n02: 0
+diff --git a/pengine/test10/rec-node-12.summary b/pengine/test10/rec-node-12.summary
+index 6316fdb..562cae9 100644
+--- a/pengine/test10/rec-node-12.summary
++++ b/pengine/test10/rec-node-12.summary
+@@ -14,6 +14,7 @@ Online: [ c001n01 c001n03 c001n08 ]
+      child_DoFencing:2	(stonith:ssh):	Stopped 
+      child_DoFencing:3	(stonith:ssh):	Stopped 
+ 
++  notice: Fencing   c001n02: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n02
+  * Start   DcIPaddr	(c001n08)
+diff --git a/pengine/test10/rec-node-13.scores b/pengine/test10/rec-node-13.scores
+index dda1134..bdb5004 100644
+--- a/pengine/test10/rec-node-13.scores
++++ b/pengine/test10/rec-node-13.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c001n04: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n02: 0
+ clone_color: DoFencing allocation score on c001n03: 0
+diff --git a/pengine/test10/rec-node-13.summary b/pengine/test10/rec-node-13.summary
+index c222ad8..d3b4d65 100644
+--- a/pengine/test10/rec-node-13.summary
++++ b/pengine/test10/rec-node-13.summary
+@@ -33,6 +33,7 @@ OFFLINE: [ c001n03 c001n05 ]
+      ocf_msdummy:10	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n06 
+      ocf_msdummy:11	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n07 
+ 
++  notice: Fencing   c001n04: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n04
+  * Stop    ocf_msdummy:6	(c001n04)
+diff --git a/pengine/test10/rec-node-14.scores b/pengine/test10/rec-node-14.scores
+index 0322231..1be723e 100644
+--- a/pengine/test10/rec-node-14.scores
++++ b/pengine/test10/rec-node-14.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
++  notice: Fencing   node3: node is unclean
+ Allocation scores:
+ native_color: lsb_dummy allocation score on node1: 0
+ native_color: lsb_dummy allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-14.summary b/pengine/test10/rec-node-14.summary
+index f503a92..a707aee 100644
+--- a/pengine/test10/rec-node-14.summary
++++ b/pengine/test10/rec-node-14.summary
+@@ -7,6 +7,9 @@ Node node3 (uuid3): UNCLEAN (offline)
+  stonith-1	(stonith:dummy):	Stopped 
+  lsb_dummy	(lsb:/usr/lib/heartbeat/cts/LSBDummy):	Stopped 
+ 
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
++  notice: Fencing   node3: node is unclean
+ Transition Summary:
+  * Fence (reboot) node3
+  * Fence (reboot) node2
+diff --git a/pengine/test10/rec-node-15.scores b/pengine/test10/rec-node-15.scores
+index 03dc6e6..d8b9617 100644
+--- a/pengine/test10/rec-node-15.scores
++++ b/pengine/test10/rec-node-15.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   sapcl03: node is unclean
+ Allocation scores:
+ group_color: Filesystem_13 allocation score on sapcl01: 0
+ group_color: Filesystem_13 allocation score on sapcl02: 0
+diff --git a/pengine/test10/rec-node-15.summary b/pengine/test10/rec-node-15.summary
+index 2f706d2..863bfd4 100644
+--- a/pengine/test10/rec-node-15.summary
++++ b/pengine/test10/rec-node-15.summary
+@@ -20,6 +20,7 @@ Online: [ sapcl01 ]
+      oracle_24	(ocf::heartbeat:oracle):	Stopped 
+      oralsnr_25	(ocf::heartbeat:oralsnr):	Stopped 
+ 
++  notice: Fencing   sapcl03: node is unclean
+ Transition Summary:
+  * Fence (reboot) sapcl03
+  * Start   stonith-1	(sapcl01)
+diff --git a/pengine/test10/rec-node-2.scores b/pengine/test10/rec-node-2.scores
+index 68e176f..6efa92d 100644
+--- a/pengine/test10/rec-node-2.scores
++++ b/pengine/test10/rec-node-2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ group_color: group1 allocation score on node1: 0
+ group_color: group1 allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-2.summary b/pengine/test10/rec-node-2.summary
+index 0e0183f..ecf6562 100644
+--- a/pengine/test10/rec-node-2.summary
++++ b/pengine/test10/rec-node-2.summary
+@@ -13,6 +13,7 @@ Online: [ node2 ]
+      rsc5	(heartbeat:apache):	Stopped 
+      rsc6	(heartbeat:apache):	Stopped 
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+diff --git a/pengine/test10/rec-node-4.scores b/pengine/test10/rec-node-4.scores
+index 1d008ec..e25a30f 100644
+--- a/pengine/test10/rec-node-4.scores
++++ b/pengine/test10/rec-node-4.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: -INFINITY
+ native_color: rsc1 allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-4.summary b/pengine/test10/rec-node-4.summary
+index 0a2606e..f46a3bb 100644
+--- a/pengine/test10/rec-node-4.summary
++++ b/pengine/test10/rec-node-4.summary
+@@ -7,6 +7,7 @@ Online: [ node2 ]
+  rsc1	(heartbeat:apache):	Started node1 (UNCLEAN)
+  rsc2	(heartbeat:apache):	Started node1 (UNCLEAN)
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+diff --git a/pengine/test10/rec-node-6.scores b/pengine/test10/rec-node-6.scores
+index 1d008ec..e25a30f 100644
+--- a/pengine/test10/rec-node-6.scores
++++ b/pengine/test10/rec-node-6.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: -INFINITY
+ native_color: rsc1 allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-6.summary b/pengine/test10/rec-node-6.summary
+index 530c7d2..37257fe 100644
+--- a/pengine/test10/rec-node-6.summary
++++ b/pengine/test10/rec-node-6.summary
+@@ -7,6 +7,7 @@ Online: [ node2 ]
+  rsc1	(heartbeat:apache):	Started node1
+  rsc2	(heartbeat:apache):	Started node1
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+diff --git a/pengine/test10/rec-node-7.scores b/pengine/test10/rec-node-7.scores
+index 1d008ec..e25a30f 100644
+--- a/pengine/test10/rec-node-7.scores
++++ b/pengine/test10/rec-node-7.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: -INFINITY
+ native_color: rsc1 allocation score on node2: 0
+diff --git a/pengine/test10/rec-node-7.summary b/pengine/test10/rec-node-7.summary
+index 0a2606e..f46a3bb 100644
+--- a/pengine/test10/rec-node-7.summary
++++ b/pengine/test10/rec-node-7.summary
+@@ -7,6 +7,7 @@ Online: [ node2 ]
+  rsc1	(heartbeat:apache):	Started node1 (UNCLEAN)
+  rsc2	(heartbeat:apache):	Started node1 (UNCLEAN)
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Start   stonith-1	(node2)
+diff --git a/pengine/test10/rec-rsc-5.scores b/pengine/test10/rec-rsc-5.scores
+index 1c640ae..ebaedbd 100644
+--- a/pengine/test10/rec-rsc-5.scores
++++ b/pengine/test10/rec-rsc-5.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: 0
+ native_color: rsc1 allocation score on node2: -INFINITY
+diff --git a/pengine/test10/rec-rsc-5.summary b/pengine/test10/rec-rsc-5.summary
+index c3e658a..6bc4010 100644
+--- a/pengine/test10/rec-rsc-5.summary
++++ b/pengine/test10/rec-rsc-5.summary
+@@ -7,6 +7,7 @@ Online: [ node1 ]
+  rsc1	(heartbeat:apache):	FAILED node2 
+  rsc2	(heartbeat:apache):	Started node2
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Start   stonith-1	(node1)
+diff --git a/pengine/test10/remote-fence-before-reconnect.scores b/pengine/test10/remote-fence-before-reconnect.scores
+index fb46919..9423693 100644
+--- a/pengine/test10/remote-fence-before-reconnect.scores
++++ b/pengine/test10/remote-fence-before-reconnect.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   c7auto4: node is unclean
+ Allocation scores:
+ native_color: c7auto4 allocation score on c7auto1: -INFINITY
+ native_color: c7auto4 allocation score on c7auto2: -INFINITY
+diff --git a/pengine/test10/remote-fence-before-reconnect.summary b/pengine/test10/remote-fence-before-reconnect.summary
+index 2ce3315..f477884 100644
+--- a/pengine/test10/remote-fence-before-reconnect.summary
++++ b/pengine/test10/remote-fence-before-reconnect.summary
+@@ -11,6 +11,7 @@ Online: [ c7auto1 c7auto2 c7auto3 ]
+  fake4	(ocf::heartbeat:Dummy):	Started c7auto2
+  fake5	(ocf::heartbeat:Dummy):	Started c7auto3
+ 
++  notice: Fencing   c7auto4: node is unclean
+ Transition Summary:
+  * Fence (reboot) c7auto4
+  * Stop    c7auto4	(c7auto1)
+diff --git a/pengine/test10/remote-fence-unclean.scores b/pengine/test10/remote-fence-unclean.scores
+index 8d29662..038ca2e 100644
+--- a/pengine/test10/remote-fence-unclean.scores
++++ b/pengine/test10/remote-fence-unclean.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   remote1: node is unclean
+ Allocation scores:
+ native_color: FAKE1 allocation score on 18builder: 0
+ native_color: FAKE1 allocation score on 18node1: 0
+diff --git a/pengine/test10/remote-fence-unclean.summary b/pengine/test10/remote-fence-unclean.summary
+index 667549b..8f37909 100644
+--- a/pengine/test10/remote-fence-unclean.summary
++++ b/pengine/test10/remote-fence-unclean.summary
+@@ -10,6 +10,7 @@ Online: [ 18builder 18node1 18node2 ]
+  FAKE3	(ocf::heartbeat:Dummy):	Started 18builder 
+  FAKE4	(ocf::heartbeat:Dummy):	Started 18node1 
+ 
++  notice: Fencing   remote1: node is unclean
+ Transition Summary:
+  * Fence (reboot) remote1
+  * Recover remote1	(Started 18node1)
+diff --git a/pengine/test10/remote-fence-unclean2.scores b/pengine/test10/remote-fence-unclean2.scores
+index 10fc7fd..937d0eb 100644
+--- a/pengine/test10/remote-fence-unclean2.scores
++++ b/pengine/test10/remote-fence-unclean2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   rhel7-alt4: node is unclean
+ Allocation scores:
+ native_color: fake allocation score on rhel7-alt1: 0
+ native_color: fake allocation score on rhel7-alt2: 0
+diff --git a/pengine/test10/remote-fence-unclean2.summary b/pengine/test10/remote-fence-unclean2.summary
+index 0844c29..060d55e 100644
+--- a/pengine/test10/remote-fence-unclean2.summary
++++ b/pengine/test10/remote-fence-unclean2.summary
+@@ -9,6 +9,7 @@ OFFLINE: [ rhel7-alt3 ]
+  rhel7-alt4	(ocf::pacemaker:remote):	Stopped 
+  fake	(ocf::heartbeat:Dummy):	Started rhel7-alt4 (UNCLEAN)
+ 
++  notice: Fencing   rhel7-alt4: node is unclean
+ Transition Summary:
+  * Fence (reboot) rhel7-alt4
+  * Stop    fake	(rhel7-alt4)
+diff --git a/pengine/test10/remote-partial-migrate2.scores b/pengine/test10/remote-partial-migrate2.scores
+index 6965507..ce095b1 100644
+--- a/pengine/test10/remote-partial-migrate2.scores
++++ b/pengine/test10/remote-partial-migrate2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   pcmk4: node is unclean
+ Allocation scores:
+ native_color: FAKE1 allocation score on pcmk1: -INFINITY
+ native_color: FAKE1 allocation score on pcmk2: 0
+diff --git a/pengine/test10/remote-partial-migrate2.summary b/pengine/test10/remote-partial-migrate2.summary
+index b8b9b4c..c9f9592 100644
+--- a/pengine/test10/remote-partial-migrate2.summary
++++ b/pengine/test10/remote-partial-migrate2.summary
+@@ -62,6 +62,7 @@ RemoteOFFLINE: [ pcmk_remote4 ]
+  FAKE49	(ocf::heartbeat:Dummy):	Started pcmk_remote3 
+  FAKE50	(ocf::heartbeat:Dummy):	Started pcmk_remote5 
+ 
++  notice: Fencing   pcmk4: node is unclean
+ Transition Summary:
+  * Fence (reboot) pcmk4
+  * Migrate pcmk_remote2	(Started pcmk3 -> pcmk1)
+diff --git a/pengine/test10/remote-recover-all.scores b/pengine/test10/remote-recover-all.scores
+index 43cac62..947f228 100644
+--- a/pengine/test10/remote-recover-all.scores
++++ b/pengine/test10/remote-recover-all.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   galera-2: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Allocation scores:
+ Using the original execution date of: 2017-05-03 13:33:24Z
+ clone_color: galera-master allocation score on controller-0: -INFINITY
+diff --git a/pengine/test10/remote-recover-all.summary b/pengine/test10/remote-recover-all.summary
+index 5e4f51d..6868533 100644
+--- a/pengine/test10/remote-recover-all.summary
++++ b/pengine/test10/remote-recover-all.summary
+@@ -37,6 +37,9 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-525400b4f6bd	(stonith:fence_ipmilan):	Started controller-0
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   galera-2: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) messaging-1
+  * Fence (reboot) galera-2
+diff --git a/pengine/test10/remote-recover-connection.scores b/pengine/test10/remote-recover-connection.scores
+index 56a18eb..3d3beae 100644
+--- a/pengine/test10/remote-recover-connection.scores
++++ b/pengine/test10/remote-recover-connection.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   controller-1: node is unclean
+ Allocation scores:
+ Using the original execution date of: 2017-05-03 13:33:24Z
+ clone_color: galera-master allocation score on controller-0: -INFINITY
+diff --git a/pengine/test10/remote-recover-connection.summary b/pengine/test10/remote-recover-connection.summary
+index 79ea7da..f21b2b5 100644
+--- a/pengine/test10/remote-recover-connection.summary
++++ b/pengine/test10/remote-recover-connection.summary
+@@ -37,6 +37,7 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-525400b4f6bd	(stonith:fence_ipmilan):	Started controller-0
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
++  notice: Fencing   controller-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) controller-1
+  * Move    messaging-1	(Started controller-1 -> controller-2)
+diff --git a/pengine/test10/remote-recover-fail.scores b/pengine/test10/remote-recover-fail.scores
+index 8fc7805..02a0643 100644
+--- a/pengine/test10/remote-recover-fail.scores
++++ b/pengine/test10/remote-recover-fail.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   rhel7-auto4: node is unclean
+ Allocation scores:
+ native_color: FAKE1 allocation score on rhel7-auto1: 0
+ native_color: FAKE1 allocation score on rhel7-auto2: 0
+diff --git a/pengine/test10/remote-recover-fail.summary b/pengine/test10/remote-recover-fail.summary
+index 313c8ac..fd518eb 100644
+--- a/pengine/test10/remote-recover-fail.summary
++++ b/pengine/test10/remote-recover-fail.summary
+@@ -13,6 +13,7 @@ OFFLINE: [ rhel7-auto1 ]
+  FAKE5	(ocf::heartbeat:Dummy):	Started rhel7-auto3 
+  FAKE6	(ocf::heartbeat:Dummy):	Started rhel7-auto4 (UNCLEAN)
+ 
++  notice: Fencing   rhel7-auto4: node is unclean
+ Transition Summary:
+  * Fence (reboot) rhel7-auto4
+  * Recover rhel7-auto4	(Started rhel7-auto2)
+diff --git a/pengine/test10/remote-recover-no-resources.scores b/pengine/test10/remote-recover-no-resources.scores
+index e918fc6..36a1ff4 100644
+--- a/pengine/test10/remote-recover-no-resources.scores
++++ b/pengine/test10/remote-recover-no-resources.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Allocation scores:
+ Using the original execution date of: 2017-05-03 13:33:24Z
+ clone_color: galera-master allocation score on controller-0: -INFINITY
+diff --git a/pengine/test10/remote-recover-no-resources.summary b/pengine/test10/remote-recover-no-resources.summary
+index bd27773..c3cd6a8 100644
+--- a/pengine/test10/remote-recover-no-resources.summary
++++ b/pengine/test10/remote-recover-no-resources.summary
+@@ -37,6 +37,8 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-525400b4f6bd	(stonith:fence_ipmilan):	Started controller-0
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) messaging-1
+  * Fence (reboot) controller-1
+diff --git a/pengine/test10/remote-recover-unknown.scores b/pengine/test10/remote-recover-unknown.scores
+index e918fc6..d7d7713 100644
+--- a/pengine/test10/remote-recover-unknown.scores
++++ b/pengine/test10/remote-recover-unknown.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   galera-2: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Allocation scores:
+ Using the original execution date of: 2017-05-03 13:33:24Z
+ clone_color: galera-master allocation score on controller-0: -INFINITY
+diff --git a/pengine/test10/remote-recover-unknown.summary b/pengine/test10/remote-recover-unknown.summary
+index 8a3d560..5b03065 100644
+--- a/pengine/test10/remote-recover-unknown.summary
++++ b/pengine/test10/remote-recover-unknown.summary
+@@ -37,6 +37,9 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-525400b4f6bd	(stonith:fence_ipmilan):	Started controller-0
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
++  notice: Fencing   controller-1: node is unclean
++  notice: Fencing   galera-2: node is unclean
++  notice: Fencing   messaging-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) messaging-1
+  * Fence (reboot) galera-2
+diff --git a/pengine/test10/remote-recovery.scores b/pengine/test10/remote-recovery.scores
+index 56a18eb..3d3beae 100644
+--- a/pengine/test10/remote-recovery.scores
++++ b/pengine/test10/remote-recovery.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   controller-1: node is unclean
+ Allocation scores:
+ Using the original execution date of: 2017-05-03 13:33:24Z
+ clone_color: galera-master allocation score on controller-0: -INFINITY
+diff --git a/pengine/test10/remote-recovery.summary b/pengine/test10/remote-recovery.summary
+index 79ea7da..f21b2b5 100644
+--- a/pengine/test10/remote-recovery.summary
++++ b/pengine/test10/remote-recovery.summary
+@@ -37,6 +37,7 @@ RemoteOnline: [ galera-0 galera-1 galera-2 messaging-0 messaging-1 messaging-2 ]
+  stonith-fence_ipmilan-525400b4f6bd	(stonith:fence_ipmilan):	Started controller-0
+  stonith-fence_ipmilan-5254005bdbb5	(stonith:fence_ipmilan):	Started controller-1 (UNCLEAN)
+ 
++  notice: Fencing   controller-1: node is unclean
+ Transition Summary:
+  * Fence (reboot) controller-1
+  * Move    messaging-1	(Started controller-1 -> controller-2)
+diff --git a/pengine/test10/remote-unclean2.scores b/pengine/test10/remote-unclean2.scores
+index 72a5953..2c2c9a5 100644
+--- a/pengine/test10/remote-unclean2.scores
++++ b/pengine/test10/remote-unclean2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   rhel7-auto4: node is unclean
+ Allocation scores:
+ native_color: rhel7-auto4 allocation score on rhel7-auto1: 0
+ native_color: rhel7-auto4 allocation score on rhel7-auto2: 0
+diff --git a/pengine/test10/remote-unclean2.summary b/pengine/test10/remote-unclean2.summary
+index 877eb4d..06047d1 100644
+--- a/pengine/test10/remote-unclean2.summary
++++ b/pengine/test10/remote-unclean2.summary
+@@ -6,6 +6,7 @@ Online: [ rhel7-auto1 rhel7-auto2 rhel7-auto3 ]
+  shooter	(stonith:fence_xvm):	Started rhel7-auto2 
+  rhel7-auto4	(ocf::pacemaker:remote):	FAILED rhel7-auto1 
+ 
++  notice: Fencing   rhel7-auto4: node is unclean
+ Transition Summary:
+  * Fence (reboot) rhel7-auto4
+  * Recover rhel7-auto4	(Started rhel7-auto1)
+diff --git a/pengine/test10/start-then-stop-with-unfence.dot b/pengine/test10/start-then-stop-with-unfence.dot
+index d8f7a71..6e9569b 100644
+--- a/pengine/test10/start-then-stop-with-unfence.dot
++++ b/pengine/test10/start-then-stop-with-unfence.dot
+@@ -23,7 +23,5 @@ digraph "g" {
+ "mpath-node2_monitor_0 rhel7-node1.example.com" [ style=bold color="green" fontcolor="black"]
+ "stonith 'on' rhel7-node1.example.com" -> "ip1_start_0 rhel7-node1.example.com" [ style = bold]
+ "stonith 'on' rhel7-node1.example.com" -> "jrummy_start_0 rhel7-node1.example.com" [ style = bold]
+-"stonith 'on' rhel7-node1.example.com" -> "mpath-node1_monitor_0 rhel7-node1.example.com" [ style = bold]
+-"stonith 'on' rhel7-node1.example.com" -> "mpath-node2_monitor_0 rhel7-node1.example.com" [ style = bold]
+ "stonith 'on' rhel7-node1.example.com" [ style=bold color="green" fontcolor="black"]
+ }
+diff --git a/pengine/test10/start-then-stop-with-unfence.exp b/pengine/test10/start-then-stop-with-unfence.exp
+index 359f25b..75cb356 100644
+--- a/pengine/test10/start-then-stop-with-unfence.exp
++++ b/pengine/test10/start-then-stop-with-unfence.exp
+@@ -1,16 +1,12 @@
+ <transition_graph cluster-delay="60s" stonith-timeout="60s" failed-stop-offset="INFINITY" failed-start-offset="INFINITY"  transition_id="0">
+-  <synapse id="0" priority="1000000">
++  <synapse id="0">
+     <action_set>
+       <rsc_op id="8" operation="monitor" operation_key="mpath-node2_monitor_0" on_node="rhel7-node1.example.com" on_node_uuid="1">
+         <primitive id="mpath-node2" class="stonith" type="fence_mpath"/>
+         <attributes CRM_meta_on_node="rhel7-node1.example.com" CRM_meta_on_node_uuid="1" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000"  devices="/dev/mapper/clustPVa" key="1234" pcmk_host_list="rhel7-node2.example.com"/>
+       </rsc_op>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <crm_event id="6" operation="stonith" operation_key="stonith-rhel7-node1.example.com-on" on_node="rhel7-node1.example.com" on_node_uuid="1"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="1">
+     <action_set>
+@@ -38,18 +34,14 @@
+       </trigger>
+     </inputs>
+   </synapse>
+-  <synapse id="3" priority="1000000">
++  <synapse id="3">
+     <action_set>
+       <rsc_op id="9" operation="monitor" operation_key="mpath-node1_monitor_0" on_node="rhel7-node1.example.com" on_node_uuid="1">
+         <primitive id="mpath-node1" class="stonith" type="fence_mpath"/>
+         <attributes CRM_meta_on_node="rhel7-node1.example.com" CRM_meta_on_node_uuid="1" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000"  devices="/dev/mapper/clustPVa" key="1233" pcmk_host_list="rhel7-node1.example.com"/>
+       </rsc_op>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <crm_event id="6" operation="stonith" operation_key="stonith-rhel7-node1.example.com-on" on_node="rhel7-node1.example.com" on_node_uuid="1"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="4">
+     <action_set>
+diff --git a/pengine/test10/start-then-stop-with-unfence.scores b/pengine/test10/start-then-stop-with-unfence.scores
+index d353bef..a53e9f2 100644
+--- a/pengine/test10/start-then-stop-with-unfence.scores
++++ b/pengine/test10/start-then-stop-with-unfence.scores
+@@ -1,3 +1,4 @@
++  notice: Unfencing rhel7-node1.example.com: Required by ip1
+ Allocation scores:
+ clone_color: jrummy-clone allocation score on rhel7-node1.example.com: 500
+ clone_color: jrummy-clone allocation score on rhel7-node2.example.com: 500
+diff --git a/pengine/test10/start-then-stop-with-unfence.summary b/pengine/test10/start-then-stop-with-unfence.summary
+index ae54afc..bb376f5 100644
+--- a/pengine/test10/start-then-stop-with-unfence.summary
++++ b/pengine/test10/start-then-stop-with-unfence.summary
+@@ -10,6 +10,7 @@ Online: [ rhel7-node1.example.com rhel7-node2.example.com ]
+      Started: [ rhel7-node2.example.com ]
+      Stopped: [ rhel7-node1.example.com ]
+ 
++  notice: Unfencing rhel7-node1.example.com: Required by ip1
+ Transition Summary:
+  * Fence (on) rhel7-node1.example.com
+  * Start   mpath-node1	(rhel7-node1.example.com)
+@@ -17,17 +18,17 @@ Transition Summary:
+  * Start   jrummy:1	(rhel7-node1.example.com)
+ 
+ Executing cluster transition:
+- * Pseudo action:   jrummy-clone_start_0
+- * Fencing rhel7-node1.example.com (on)
+  * Resource action: mpath-node2     monitor on rhel7-node1.example.com
+  * Resource action: mpath-node1     monitor on rhel7-node1.example.com
++ * Pseudo action:   jrummy-clone_start_0
++ * Fencing rhel7-node1.example.com (on)
++ * Resource action: mpath-node1     start on rhel7-node1.example.com
+  * Resource action: jrummy          start on rhel7-node1.example.com
+  * Pseudo action:   jrummy-clone_running_0
+- * Resource action: mpath-node1     start on rhel7-node1.example.com
++ * Resource action: mpath-node1     monitor=60000 on rhel7-node1.example.com
+  * Resource action: ip1             stop on rhel7-node2.example.com
+  * Resource action: jrummy          monitor=10000 on rhel7-node1.example.com
+  * Pseudo action:   all_stopped
+- * Resource action: mpath-node1     monitor=60000 on rhel7-node1.example.com
+  * Resource action: ip1             start on rhel7-node1.example.com
+  * Resource action: ip1             monitor=10000 on rhel7-node1.example.com
+ 
+diff --git a/pengine/test10/start-then-stop-with-unfence.xml b/pengine/test10/start-then-stop-with-unfence.xml
+index 499022e..b856250 100644
+--- a/pengine/test10/start-then-stop-with-unfence.xml
++++ b/pengine/test10/start-then-stop-with-unfence.xml
+@@ -95,6 +95,7 @@
+         <instance_attributes id="status-2">
+           <nvpair id="status-2-shutdown" name="shutdown" value="0"/>
+           <nvpair id="status-2-probe_complete" name="probe_complete" value="true"/>
++	  <nvpair id="status-2-unfenced" name="node_unfenced" value="1234567"/>
+         </instance_attributes>
+       </transient_attributes>
+       <lrm id="2">
+diff --git a/pengine/test10/stonith-0.scores b/pengine/test10/stonith-0.scores
+index 7aab8cd..db3ddb9 100644
+--- a/pengine/test10/stonith-0.scores
++++ b/pengine/test10/stonith-0.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   c001n03: node is unclean
++  notice: Fencing   c001n05: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on c001n02: 0
+ clone_color: DoFencing allocation score on c001n03: 0
+diff --git a/pengine/test10/stonith-0.summary b/pengine/test10/stonith-0.summary
+index ee8ae15..6983a90 100644
+--- a/pengine/test10/stonith-0.summary
++++ b/pengine/test10/stonith-0.summary
+@@ -36,6 +36,8 @@ Online: [ c001n02 c001n04 c001n06 c001n07 c001n08 ]
+      ocf_msdummy:12	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n06 
+      ocf_msdummy:13	(ocf::heartbeat:/usr/lib/heartbeat/cts/OCFMSDummy):	Slave c001n06 
+ 
++  notice: Fencing   c001n03: node is unclean
++  notice: Fencing   c001n05: node is unclean
+ Transition Summary:
+  * Fence (reboot) c001n05
+  * Fence (reboot) c001n03
+diff --git a/pengine/test10/stonith-1.scores b/pengine/test10/stonith-1.scores
+index 7422355..196b9f5 100644
+--- a/pengine/test10/stonith-1.scores
++++ b/pengine/test10/stonith-1.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   sles-3: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on sles-1: 0
+ clone_color: DoFencing allocation score on sles-2: 0
+diff --git a/pengine/test10/stonith-1.summary b/pengine/test10/stonith-1.summary
+index b68aca7..111bcbe 100644
+--- a/pengine/test10/stonith-1.summary
++++ b/pengine/test10/stonith-1.summary
+@@ -27,6 +27,7 @@ Online: [ sles-1 sles-2 sles-4 ]
+      ocf_msdummy:6	(ocf::heartbeat:Stateful):	Stopped 
+      ocf_msdummy:7	(ocf::heartbeat:Stateful):	Stopped 
+ 
++  notice: Fencing   sles-3: node is unclean
+ Transition Summary:
+  * Fence (reboot) sles-3
+  * Start   r192.168.100.183	(sles-1)
+diff --git a/pengine/test10/stonith-2.scores b/pengine/test10/stonith-2.scores
+index e1dd011..8c11561 100644
+--- a/pengine/test10/stonith-2.scores
++++ b/pengine/test10/stonith-2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   sles-5: node is unclean
+ Allocation scores:
+ clone_color: DoFencing allocation score on sles-1: 0
+ clone_color: DoFencing allocation score on sles-2: 0
+diff --git a/pengine/test10/stonith-2.summary b/pengine/test10/stonith-2.summary
+index eef35c4..c8e1d70 100644
+--- a/pengine/test10/stonith-2.summary
++++ b/pengine/test10/stonith-2.summary
+@@ -32,6 +32,7 @@ Online: [ sles-1 sles-2 sles-3 sles-4 sles-6 ]
+      ocf_msdummy:10	(ocf::heartbeat:Stateful):	Slave sles-2 
+      ocf_msdummy:11	(ocf::heartbeat:Stateful):	Slave sles-3 
+ 
++  notice: Fencing   sles-5: node is unclean
+ Transition Summary:
+  * Fence (reboot) sles-5
+  * Start   rsc_sles-5	(sles-6)
+diff --git a/pengine/test10/stonith-3.scores b/pengine/test10/stonith-3.scores
+index a1bd3d9..eef30fc 100644
+--- a/pengine/test10/stonith-3.scores
++++ b/pengine/test10/stonith-3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   rh5node1: node is unclean
+ Allocation scores:
+ clone_color: clnStonith allocation score on rh5node1: 0
+ clone_color: clnStonith allocation score on rh5node2: 0
+diff --git a/pengine/test10/stonith-3.summary b/pengine/test10/stonith-3.summary
+index 398b6bc..015dd77 100644
+--- a/pengine/test10/stonith-3.summary
++++ b/pengine/test10/stonith-3.summary
+@@ -7,6 +7,7 @@ Online: [ rh5node2 ]
+  Clone Set: clnStonith [grpStonith]
+      Stopped: [ rh5node1 rh5node2 ]
+ 
++  notice: Fencing   rh5node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) rh5node1
+  * Start   prmIpPostgreSQLDB	(rh5node2)
+diff --git a/pengine/test10/stonith-4.scores b/pengine/test10/stonith-4.scores
+index ac6fe0b..0bf1cf5 100644
+--- a/pengine/test10/stonith-4.scores
++++ b/pengine/test10/stonith-4.scores
+@@ -1,3 +1,7 @@
++  notice: Fencing   pcmk-10: node is unclean
++  notice: Fencing   pcmk-5: node is unclean
++  notice: Fencing   pcmk-7: node is unclean
++  notice: Fencing   pcmk-8: node is unclean
+ Allocation scores:
+ native_color: Fencing allocation score on pcmk-10: 0
+ native_color: Fencing allocation score on pcmk-11: 0
+diff --git a/pengine/test10/stonith-4.summary b/pengine/test10/stonith-4.summary
+index 6e3e396..0c9b5bd 100644
+--- a/pengine/test10/stonith-4.summary
++++ b/pengine/test10/stonith-4.summary
+@@ -13,6 +13,10 @@ OFFLINE: [ pcmk-4 pcmk-6 ]
+ 
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
++  notice: Fencing   pcmk-10: node is unclean
++  notice: Fencing   pcmk-5: node is unclean
++  notice: Fencing   pcmk-7: node is unclean
++  notice: Fencing   pcmk-8: node is unclean
+ Transition Summary:
+  * Fence (reboot) pcmk-8
+  * Fence (reboot) pcmk-7
+diff --git a/pengine/test10/stop-failure-no-quorum.scores b/pengine/test10/stop-failure-no-quorum.scores
+index df30423..c1893b6 100644
+--- a/pengine/test10/stop-failure-no-quorum.scores
++++ b/pengine/test10/stop-failure-no-quorum.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   pcmk-2: node is unclean
+ Allocation scores:
+ clone_color: clvm-clone allocation score on pcmk-1: 0
+ clone_color: clvm-clone allocation score on pcmk-2: -INFINITY
+diff --git a/pengine/test10/stop-failure-no-quorum.summary b/pengine/test10/stop-failure-no-quorum.summary
+index 0248126..d91edc1 100644
+--- a/pengine/test10/stop-failure-no-quorum.summary
++++ b/pengine/test10/stop-failure-no-quorum.summary
+@@ -14,6 +14,7 @@ Online: [ pcmk-1 ]
+  ClusterIP	(ocf::heartbeat:IPaddr2):	Stopped 
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
++  notice: Fencing   pcmk-2: node is unclean
+ Transition Summary:
+  * Fence (reboot) pcmk-2
+  * Start   dlm:0	(pcmk-1 - blocked)
+diff --git a/pengine/test10/stop-failure-with-fencing.scores b/pengine/test10/stop-failure-with-fencing.scores
+index cf62806..0dc0813 100644
+--- a/pengine/test10/stop-failure-with-fencing.scores
++++ b/pengine/test10/stop-failure-with-fencing.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   pcmk-2: node is unclean
+ Allocation scores:
+ clone_color: clvm-clone allocation score on pcmk-1: 0
+ clone_color: clvm-clone allocation score on pcmk-2: -INFINITY
+diff --git a/pengine/test10/stop-failure-with-fencing.summary b/pengine/test10/stop-failure-with-fencing.summary
+index e6c296b..79e6105 100644
+--- a/pengine/test10/stop-failure-with-fencing.summary
++++ b/pengine/test10/stop-failure-with-fencing.summary
+@@ -13,6 +13,7 @@ Online: [ pcmk-1 ]
+  ClusterIP	(ocf::heartbeat:IPaddr2):	Stopped 
+  Fencing	(stonith:fence_xvm):	Stopped 
+ 
++  notice: Fencing   pcmk-2: node is unclean
+ Transition Summary:
+  * Fence (reboot) pcmk-2
+  * Start   dlm:0	(pcmk-1 - blocked)
+diff --git a/pengine/test10/systemhealth1.scores b/pengine/test10/systemhealth1.scores
+index 8a59654..c55f6e2 100644
+--- a/pengine/test10/systemhealth1.scores
++++ b/pengine/test10/systemhealth1.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealth1.summary b/pengine/test10/systemhealth1.summary
+index 7301c6c..335b94a 100644
+--- a/pengine/test10/systemhealth1.summary
++++ b/pengine/test10/systemhealth1.summary
+@@ -7,6 +7,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Fence (reboot) hs21c
+diff --git a/pengine/test10/systemhealth2.scores b/pengine/test10/systemhealth2.scores
+index 8a59654..b20bd49 100644
+--- a/pengine/test10/systemhealth2.scores
++++ b/pengine/test10/systemhealth2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealth2.summary b/pengine/test10/systemhealth2.summary
+index c83a7e2..b04d5a1 100644
+--- a/pengine/test10/systemhealth2.summary
++++ b/pengine/test10/systemhealth2.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+diff --git a/pengine/test10/systemhealth3.scores b/pengine/test10/systemhealth3.scores
+index 8a59654..b20bd49 100644
+--- a/pengine/test10/systemhealth3.scores
++++ b/pengine/test10/systemhealth3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealth3.summary b/pengine/test10/systemhealth3.summary
+index c83a7e2..b04d5a1 100644
+--- a/pengine/test10/systemhealth3.summary
++++ b/pengine/test10/systemhealth3.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+diff --git a/pengine/test10/systemhealthm1.scores b/pengine/test10/systemhealthm1.scores
+index 8a59654..c55f6e2 100644
+--- a/pengine/test10/systemhealthm1.scores
++++ b/pengine/test10/systemhealthm1.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthm1.summary b/pengine/test10/systemhealthm1.summary
+index 7301c6c..335b94a 100644
+--- a/pengine/test10/systemhealthm1.summary
++++ b/pengine/test10/systemhealthm1.summary
+@@ -7,6 +7,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Fence (reboot) hs21c
+diff --git a/pengine/test10/systemhealthm2.scores b/pengine/test10/systemhealthm2.scores
+index 8a59654..b20bd49 100644
+--- a/pengine/test10/systemhealthm2.scores
++++ b/pengine/test10/systemhealthm2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthm2.summary b/pengine/test10/systemhealthm2.summary
+index c83a7e2..b04d5a1 100644
+--- a/pengine/test10/systemhealthm2.summary
++++ b/pengine/test10/systemhealthm2.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+diff --git a/pengine/test10/systemhealthm3.scores b/pengine/test10/systemhealthm3.scores
+index 7e8804e..00b8d64 100644
+--- a/pengine/test10/systemhealthm3.scores
++++ b/pengine/test10/systemhealthm3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: -INFINITY
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthm3.summary b/pengine/test10/systemhealthm3.summary
+index fbcdec5..55d5cf7 100644
+--- a/pengine/test10/systemhealthm3.summary
++++ b/pengine/test10/systemhealthm3.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+ 
+diff --git a/pengine/test10/systemhealthn1.scores b/pengine/test10/systemhealthn1.scores
+index 8a59654..c55f6e2 100644
+--- a/pengine/test10/systemhealthn1.scores
++++ b/pengine/test10/systemhealthn1.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthn1.summary b/pengine/test10/systemhealthn1.summary
+index 7301c6c..335b94a 100644
+--- a/pengine/test10/systemhealthn1.summary
++++ b/pengine/test10/systemhealthn1.summary
+@@ -7,6 +7,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Fence (reboot) hs21c
+diff --git a/pengine/test10/systemhealthn2.scores b/pengine/test10/systemhealthn2.scores
+index 8a59654..b20bd49 100644
+--- a/pengine/test10/systemhealthn2.scores
++++ b/pengine/test10/systemhealthn2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthn2.summary b/pengine/test10/systemhealthn2.summary
+index c83a7e2..b04d5a1 100644
+--- a/pengine/test10/systemhealthn2.summary
++++ b/pengine/test10/systemhealthn2.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+diff --git a/pengine/test10/systemhealthn3.scores b/pengine/test10/systemhealthn3.scores
+index 8a59654..b20bd49 100644
+--- a/pengine/test10/systemhealthn3.scores
++++ b/pengine/test10/systemhealthn3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthn3.summary b/pengine/test10/systemhealthn3.summary
+index c83a7e2..b04d5a1 100644
+--- a/pengine/test10/systemhealthn3.summary
++++ b/pengine/test10/systemhealthn3.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   stonith-1	(hs21c)
+diff --git a/pengine/test10/systemhealtho1.scores b/pengine/test10/systemhealtho1.scores
+index 8a59654..c55f6e2 100644
+--- a/pengine/test10/systemhealtho1.scores
++++ b/pengine/test10/systemhealtho1.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealtho1.summary b/pengine/test10/systemhealtho1.summary
+index 7301c6c..335b94a 100644
+--- a/pengine/test10/systemhealtho1.summary
++++ b/pengine/test10/systemhealtho1.summary
+@@ -7,6 +7,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Fence (reboot) hs21c
+diff --git a/pengine/test10/systemhealtho2.scores b/pengine/test10/systemhealtho2.scores
+index 7e8804e..00b8d64 100644
+--- a/pengine/test10/systemhealtho2.scores
++++ b/pengine/test10/systemhealtho2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: -INFINITY
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealtho2.summary b/pengine/test10/systemhealtho2.summary
+index fbcdec5..55d5cf7 100644
+--- a/pengine/test10/systemhealtho2.summary
++++ b/pengine/test10/systemhealtho2.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+ 
+diff --git a/pengine/test10/systemhealtho3.scores b/pengine/test10/systemhealtho3.scores
+index 7e8804e..00b8d64 100644
+--- a/pengine/test10/systemhealtho3.scores
++++ b/pengine/test10/systemhealtho3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: -INFINITY
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealtho3.summary b/pengine/test10/systemhealtho3.summary
+index fbcdec5..55d5cf7 100644
+--- a/pengine/test10/systemhealtho3.summary
++++ b/pengine/test10/systemhealtho3.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+ 
+diff --git a/pengine/test10/systemhealthp1.scores b/pengine/test10/systemhealthp1.scores
+index 8a59654..c55f6e2 100644
+--- a/pengine/test10/systemhealthp1.scores
++++ b/pengine/test10/systemhealthp1.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 100
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthp1.summary b/pengine/test10/systemhealthp1.summary
+index 7301c6c..335b94a 100644
+--- a/pengine/test10/systemhealthp1.summary
++++ b/pengine/test10/systemhealthp1.summary
+@@ -7,6 +7,8 @@ Node hs21d (737318c6-0f92-4592-9754-45967d45aff7): UNCLEAN (offline)
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21c: node is unclean
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Fence (reboot) hs21c
+diff --git a/pengine/test10/systemhealthp2.scores b/pengine/test10/systemhealthp2.scores
+index 20a08f2..7ca75bf 100644
+--- a/pengine/test10/systemhealthp2.scores
++++ b/pengine/test10/systemhealthp2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: 0
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthp2.summary b/pengine/test10/systemhealthp2.summary
+index ea9465b..6c44a74 100644
+--- a/pengine/test10/systemhealthp2.summary
++++ b/pengine/test10/systemhealthp2.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+  * Start   apache_1	(hs21c)
+diff --git a/pengine/test10/systemhealthp3.scores b/pengine/test10/systemhealthp3.scores
+index 7e8804e..00b8d64 100644
+--- a/pengine/test10/systemhealthp3.scores
++++ b/pengine/test10/systemhealthp3.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   hs21d: node is unclean
+ Allocation scores:
+ native_color: apache_1 allocation score on hs21c: -INFINITY
+ native_color: apache_1 allocation score on hs21d: 0
+diff --git a/pengine/test10/systemhealthp3.summary b/pengine/test10/systemhealthp3.summary
+index fbcdec5..55d5cf7 100644
+--- a/pengine/test10/systemhealthp3.summary
++++ b/pengine/test10/systemhealthp3.summary
+@@ -7,6 +7,7 @@ Online: [ hs21c ]
+  apache_1	(ocf::heartbeat:apache):	Stopped 
+  nfs_1	(ocf::heartbeat:Filesystem):	Stopped 
+ 
++  notice: Fencing   hs21d: node is unclean
+ Transition Summary:
+  * Fence (reboot) hs21d
+ 
+diff --git a/pengine/test10/ticket-clone-21.scores b/pengine/test10/ticket-clone-21.scores
+index 89e2d0f..e0fc0d8 100644
+--- a/pengine/test10/ticket-clone-21.scores
++++ b/pengine/test10/ticket-clone-21.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ clone_color: clone1 allocation score on node1: 0
+ clone_color: clone1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-clone-21.summary b/pengine/test10/ticket-clone-21.summary
+index 573f8c1..13d2887 100644
+--- a/pengine/test10/ticket-clone-21.summary
++++ b/pengine/test10/ticket-clone-21.summary
+@@ -6,6 +6,8 @@ Online: [ node1 node2 ]
+  Clone Set: clone1 [rsc1]
+      Started: [ node1 node2 ]
+ 
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Fence (reboot) node1
+diff --git a/pengine/test10/ticket-clone-9.scores b/pengine/test10/ticket-clone-9.scores
+index 89e2d0f..e0fc0d8 100644
+--- a/pengine/test10/ticket-clone-9.scores
++++ b/pengine/test10/ticket-clone-9.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ clone_color: clone1 allocation score on node1: 0
+ clone_color: clone1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-clone-9.summary b/pengine/test10/ticket-clone-9.summary
+index 573f8c1..13d2887 100644
+--- a/pengine/test10/ticket-clone-9.summary
++++ b/pengine/test10/ticket-clone-9.summary
+@@ -6,6 +6,8 @@ Online: [ node1 node2 ]
+  Clone Set: clone1 [rsc1]
+      Started: [ node1 node2 ]
+ 
++  notice: Fencing   node1: node is unclean
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Fence (reboot) node1
+diff --git a/pengine/test10/ticket-group-21.scores b/pengine/test10/ticket-group-21.scores
+index e5b8167..8f01379 100644
+--- a/pengine/test10/ticket-group-21.scores
++++ b/pengine/test10/ticket-group-21.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ group_color: group1 allocation score on node1: 0
+ group_color: group1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-group-21.summary b/pengine/test10/ticket-group-21.summary
+index ff809ae..80fb33f 100644
+--- a/pengine/test10/ticket-group-21.summary
++++ b/pengine/test10/ticket-group-21.summary
+@@ -7,6 +7,7 @@ Online: [ node1 node2 ]
+      rsc1	(ocf::pacemaker:Dummy):	Started node2
+      rsc2	(ocf::pacemaker:Dummy):	Started node2
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+diff --git a/pengine/test10/ticket-group-9.scores b/pengine/test10/ticket-group-9.scores
+index e5b8167..8f01379 100644
+--- a/pengine/test10/ticket-group-9.scores
++++ b/pengine/test10/ticket-group-9.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ group_color: group1 allocation score on node1: 0
+ group_color: group1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-group-9.summary b/pengine/test10/ticket-group-9.summary
+index ff809ae..80fb33f 100644
+--- a/pengine/test10/ticket-group-9.summary
++++ b/pengine/test10/ticket-group-9.summary
+@@ -7,6 +7,7 @@ Online: [ node1 node2 ]
+      rsc1	(ocf::pacemaker:Dummy):	Started node2
+      rsc2	(ocf::pacemaker:Dummy):	Started node2
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+diff --git a/pengine/test10/ticket-master-21.scores b/pengine/test10/ticket-master-21.scores
+index dc79d67..89eac5e 100644
+--- a/pengine/test10/ticket-master-21.scores
++++ b/pengine/test10/ticket-master-21.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ clone_color: ms1 allocation score on node1: 0
+ clone_color: ms1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-master-21.summary b/pengine/test10/ticket-master-21.summary
+index c196c9d..dc2f5db 100644
+--- a/pengine/test10/ticket-master-21.summary
++++ b/pengine/test10/ticket-master-21.summary
+@@ -7,6 +7,7 @@ Online: [ node1 node2 ]
+      Masters: [ node1 ]
+      Slaves: [ node2 ]
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Move    rsc_stonith	(Started node1 -> node2)
+diff --git a/pengine/test10/ticket-master-9.scores b/pengine/test10/ticket-master-9.scores
+index dc79d67..89eac5e 100644
+--- a/pengine/test10/ticket-master-9.scores
++++ b/pengine/test10/ticket-master-9.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node1: node is unclean
+ Allocation scores:
+ clone_color: ms1 allocation score on node1: 0
+ clone_color: ms1 allocation score on node2: 0
+diff --git a/pengine/test10/ticket-master-9.summary b/pengine/test10/ticket-master-9.summary
+index c196c9d..dc2f5db 100644
+--- a/pengine/test10/ticket-master-9.summary
++++ b/pengine/test10/ticket-master-9.summary
+@@ -7,6 +7,7 @@ Online: [ node1 node2 ]
+      Masters: [ node1 ]
+      Slaves: [ node2 ]
+ 
++  notice: Fencing   node1: node is unclean
+ Transition Summary:
+  * Fence (reboot) node1
+  * Move    rsc_stonith	(Started node1 -> node2)
+diff --git a/pengine/test10/ticket-primitive-21.scores b/pengine/test10/ticket-primitive-21.scores
+index ed3f3cd..d1147ca 100644
+--- a/pengine/test10/ticket-primitive-21.scores
++++ b/pengine/test10/ticket-primitive-21.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: -INFINITY
+ native_color: rsc1 allocation score on node2: -INFINITY
+diff --git a/pengine/test10/ticket-primitive-21.summary b/pengine/test10/ticket-primitive-21.summary
+index 08a4860..d3d02fe 100644
+--- a/pengine/test10/ticket-primitive-21.summary
++++ b/pengine/test10/ticket-primitive-21.summary
+@@ -5,6 +5,7 @@ Online: [ node1 node2 ]
+  rsc_stonith	(stonith:null):	Started node1
+  rsc1	(ocf::pacemaker:Dummy):	Started node2
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+diff --git a/pengine/test10/ticket-primitive-9.scores b/pengine/test10/ticket-primitive-9.scores
+index ed3f3cd..d1147ca 100644
+--- a/pengine/test10/ticket-primitive-9.scores
++++ b/pengine/test10/ticket-primitive-9.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   node2: node is unclean
+ Allocation scores:
+ native_color: rsc1 allocation score on node1: -INFINITY
+ native_color: rsc1 allocation score on node2: -INFINITY
+diff --git a/pengine/test10/ticket-primitive-9.summary b/pengine/test10/ticket-primitive-9.summary
+index 08a4860..d3d02fe 100644
+--- a/pengine/test10/ticket-primitive-9.summary
++++ b/pengine/test10/ticket-primitive-9.summary
+@@ -5,6 +5,7 @@ Online: [ node1 node2 ]
+  rsc_stonith	(stonith:null):	Started node1
+  rsc1	(ocf::pacemaker:Dummy):	Started node2
+ 
++  notice: Fencing   node2: node is unclean
+ Transition Summary:
+  * Fence (reboot) node2
+  * Stop    rsc1	(node2)
+diff --git a/pengine/test10/unfence-definition.dot b/pengine/test10/unfence-definition.dot
+index a9e7e6b..c16bdb5 100644
+--- a/pengine/test10/unfence-definition.dot
++++ b/pengine/test10/unfence-definition.dot
+@@ -19,7 +19,6 @@ digraph "g" {
+ "clvmd:1_start_0 virt-2" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "clvmd:1_start_0 virt-2" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_monitor_0 virt-3" -> "clvmd-clone_start_0" [ style = bold]
+-"clvmd:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "clvmd:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_start_0 virt-3" -> "clvmd-clone_running_0" [ style = bold]
+ "clvmd:2_start_0 virt-3" [ style=bold color="green" fontcolor="black"]
+@@ -44,7 +43,6 @@ digraph "g" {
+ "dlm-clone_stopped_0" -> "dlm-clone_start_0" [ style = bold]
+ "dlm-clone_stopped_0" [ style=bold color="green" fontcolor="orange"]
+ "dlm:2_monitor_0 virt-3" -> "dlm-clone_start_0" [ style = bold]
+-"dlm:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "dlm:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "dlm:2_start_0 virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "dlm:2_start_0 virt-3" -> "dlm-clone_running_0" [ style = bold]
+@@ -70,9 +68,10 @@ digraph "g" {
+ "stonith 'on' virt-1" -> "clvmd_start_0 virt-1" [ style = bold]
+ "stonith 'on' virt-1" -> "dlm_start_0 virt-1" [ style = bold]
+ "stonith 'on' virt-1" [ style=bold color="green" fontcolor="black"]
++"stonith 'on' virt-3" -> "clvmd:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
++"stonith 'on' virt-3" -> "dlm:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "dlm:2_start_0 virt-3" [ style = bold]
+-"stonith 'on' virt-3" -> "fencing_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" [ style=bold color="green" fontcolor="black"]
+ "stonith 'reboot' virt-4" -> "stonith_complete" [ style = bold]
+ "stonith 'reboot' virt-4" [ style=bold color="green" fontcolor="black"]
+diff --git a/pengine/test10/unfence-definition.exp b/pengine/test10/unfence-definition.exp
+index 46d5883..f9ad4c1 100644
+--- a/pengine/test10/unfence-definition.exp
++++ b/pengine/test10/unfence-definition.exp
+@@ -21,18 +21,14 @@
+       </trigger>
+     </inputs>
+   </synapse>
+-  <synapse id="1" priority="1000000">
++  <synapse id="1">
+     <action_set>
+       <rsc_op id="9" operation="monitor" operation_key="fencing_monitor_0" on_node="virt-3" on_node_uuid="3">
+         <primitive id="fencing" class="stonith" type="fence_scsi"/>
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="2">
+     <action_set>
+@@ -124,7 +120,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="8" priority="1000000">
+     <action_set>
+@@ -284,7 +284,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="18" priority="1000000">
+     <action_set>
+@@ -380,19 +384,12 @@
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <rsc_op id="10" operation="monitor" operation_key="dlm:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-      <trigger>
+-        <rsc_op id="11" operation="monitor" operation_key="clvmd:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="25">
+     <action_set>
+       <crm_event id="2" operation="stonith" operation_key="stonith-virt-1-on" on_node="virt-1" on_node_uuid="1">
+-        <attributes CRM_meta_on_node="virt-1" CRM_meta_on_node_uuid="1" CRM_meta_stonith_action="on" />
++        <attributes CRM_meta_node_unfenced="1234567" CRM_meta_on_node="virt-1" CRM_meta_on_node_uuid="1" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+     <inputs>
+diff --git a/pengine/test10/unfence-definition.scores b/pengine/test10/unfence-definition.scores
+index d9fa9bb..3d5aa9f 100644
+--- a/pengine/test10/unfence-definition.scores
++++ b/pengine/test10/unfence-definition.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   virt-4: node is unclean
++  notice: Unfencing virt-1: Device definition changed
++  notice: Unfencing virt-3: Required by dlm:2
+ Allocation scores:
+ clone_color: clvmd-clone allocation score on virt-1: 0
+ clone_color: clvmd-clone allocation score on virt-2: 0
+diff --git a/pengine/test10/unfence-definition.summary b/pengine/test10/unfence-definition.summary
+index 9477a02..a31cc20 100644
+--- a/pengine/test10/unfence-definition.summary
++++ b/pengine/test10/unfence-definition.summary
+@@ -11,6 +11,9 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Started: [ virt-1 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
++  notice: Unfencing virt-1: Device definition changed
++  notice: Unfencing virt-3: Required by dlm:2
++  notice: Fencing   virt-4: node is unclean
+ Transition Summary:
+  * Fence (reboot) virt-4
+  * Fence (on) virt-3
+@@ -23,18 +26,18 @@ Transition Summary:
+  * Start   clvmd:2	(virt-3)
+ 
+ Executing cluster transition:
+- * Resource action: dlm             monitor on virt-3
++ * Resource action: fencing         monitor on virt-3
++ * Resource action: fencing         stop on virt-1
+  * Resource action: clvmd           monitor on virt-2
+- * Resource action: clvmd           monitor on virt-3
+  * Pseudo action:   clvmd-clone_stop_0
+  * Fencing virt-4 (reboot)
+  * Pseudo action:   stonith_complete
+  * Fencing virt-3 (on)
+- * Resource action: fencing         monitor on virt-3
+- * Resource action: fencing         stop on virt-1
++ * Resource action: fencing         delete on virt-1
++ * Resource action: dlm             monitor on virt-3
+  * Resource action: clvmd           stop on virt-1
++ * Resource action: clvmd           monitor on virt-3
+  * Pseudo action:   clvmd-clone_stopped_0
+- * Resource action: fencing         delete on virt-1
+  * Pseudo action:   dlm-clone_stop_0
+  * Resource action: dlm             stop on virt-1
+  * Pseudo action:   dlm-clone_stopped_0
+diff --git a/pengine/test10/unfence-definition.xml b/pengine/test10/unfence-definition.xml
+index 5d77931..cb189cd 100644
+--- a/pengine/test10/unfence-definition.xml
++++ b/pengine/test10/unfence-definition.xml
+@@ -41,6 +41,11 @@
+   </configuration>
+   <status>
+     <node_state id="1" uname="virt-1" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-1">
++        <instance_attributes id="status-virt-1">
++          <nvpair id="status-virt-1" name="node_unfenced" value="1234567"/>
++        </instance_attributes>
++      </transient_attributes>
+       <lrm id="1">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_virt" class="stonith">
+@@ -56,6 +61,11 @@
+       </lrm>
+     </node_state>
+     <node_state id="2" uname="virt-2" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-2">
++        <instance_attributes id="status-virt-2">
++          <nvpair id="unfenced-virt-2" name="node_unfenced" value="1234567"/>
++        </instance_attributes>
++      </transient_attributes>
+       <lrm id="2">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_scsi" class="stonith">
+diff --git a/pengine/test10/unfence-parameters.dot b/pengine/test10/unfence-parameters.dot
+index c96d314..dee850e 100644
+--- a/pengine/test10/unfence-parameters.dot
++++ b/pengine/test10/unfence-parameters.dot
+@@ -14,13 +14,11 @@ digraph "g" {
+ "clvmd-clone_stopped_0" -> "dlm-clone_stop_0" [ style = bold]
+ "clvmd-clone_stopped_0" [ style=bold color="green" fontcolor="orange"]
+ "clvmd:1_monitor_0 virt-2" -> "clvmd-clone_start_0" [ style = bold]
+-"clvmd:1_monitor_0 virt-2" -> "stonith 'on' virt-2" [ style = bold]
+ "clvmd:1_monitor_0 virt-2" [ style=bold color="green" fontcolor="black"]
+ "clvmd:1_start_0 virt-2" -> "clvmd-clone_running_0" [ style = bold]
+ "clvmd:1_start_0 virt-2" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "clvmd:1_start_0 virt-2" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_monitor_0 virt-3" -> "clvmd-clone_start_0" [ style = bold]
+-"clvmd:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "clvmd:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_start_0 virt-3" -> "clvmd-clone_running_0" [ style = bold]
+ "clvmd:2_start_0 virt-3" -> "clvmd:3_start_0 <none>" [ style = dashed]
+@@ -50,7 +48,6 @@ digraph "g" {
+ "dlm-clone_stopped_0" -> "dlm-clone_start_0" [ style = bold]
+ "dlm-clone_stopped_0" [ style=bold color="green" fontcolor="orange"]
+ "dlm:2_monitor_0 virt-3" -> "dlm-clone_start_0" [ style = bold]
+-"dlm:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "dlm:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "dlm:2_start_0 virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "dlm:2_start_0 virt-3" -> "dlm-clone_running_0" [ style = bold]
+@@ -85,12 +82,14 @@ digraph "g" {
+ "stonith 'on' virt-1" -> "clvmd_start_0 virt-1" [ style = bold]
+ "stonith 'on' virt-1" -> "dlm_start_0 virt-1" [ style = bold]
+ "stonith 'on' virt-1" [ style=bold color="green" fontcolor="black"]
++"stonith 'on' virt-2" -> "clvmd:1_monitor_0 virt-2" [ style = bold]
+ "stonith 'on' virt-2" -> "clvmd:1_start_0 virt-2" [ style = bold]
+ "stonith 'on' virt-2" -> "dlm_start_0 virt-2" [ style = bold]
+ "stonith 'on' virt-2" [ style=bold color="green" fontcolor="black"]
++"stonith 'on' virt-3" -> "clvmd:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
++"stonith 'on' virt-3" -> "dlm:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "dlm:2_start_0 virt-3" [ style = bold]
+-"stonith 'on' virt-3" -> "fencing_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" [ style=bold color="green" fontcolor="black"]
+ "stonith 'reboot' virt-4" -> "stonith_complete" [ style = bold]
+ "stonith 'reboot' virt-4" [ style=bold color="green" fontcolor="black"]
+diff --git a/pengine/test10/unfence-parameters.exp b/pengine/test10/unfence-parameters.exp
+index ffc20c0..54c242a 100644
+--- a/pengine/test10/unfence-parameters.exp
++++ b/pengine/test10/unfence-parameters.exp
+@@ -12,18 +12,14 @@
+       </trigger>
+     </inputs>
+   </synapse>
+-  <synapse id="1" priority="1000000">
++  <synapse id="1">
+     <action_set>
+       <rsc_op id="8" operation="monitor" operation_key="fencing_monitor_0" on_node="virt-3" on_node_uuid="3">
+         <primitive id="fencing" class="stonith" type="fence_scsi"/>
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="2">
+     <action_set>
+@@ -152,7 +148,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="9" priority="1000000">
+     <action_set>
+@@ -290,7 +290,11 @@
+         <attributes CRM_meta_clone="1" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-2" CRM_meta_on_node_uuid="2" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="3" operation="stonith" operation_key="stonith-virt-2-on" on_node="virt-2" on_node_uuid="2"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="17">
+     <action_set>
+@@ -324,7 +328,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="19" priority="1000000">
+     <action_set>
+@@ -420,26 +428,16 @@
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <rsc_op id="9" operation="monitor" operation_key="dlm:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-      <trigger>
+-        <rsc_op id="10" operation="monitor" operation_key="clvmd:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="26">
+     <action_set>
+       <crm_event id="3" operation="stonith" operation_key="stonith-virt-2-on" on_node="virt-2" on_node_uuid="2">
+-        <attributes CRM_meta_on_node="virt-2" CRM_meta_on_node_uuid="2" CRM_meta_stonith_action="on" />
++        <attributes CRM_meta_node_unfenced="1234567" CRM_meta_on_node="virt-2" CRM_meta_on_node_uuid="2" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+     <inputs>
+       <trigger>
+-        <rsc_op id="7" operation="monitor" operation_key="clvmd:1_monitor_0" on_node="virt-2" on_node_uuid="2"/>
+-      </trigger>
+-      <trigger>
+         <rsc_op id="14" operation="stop" operation_key="dlm_stop_0" internal_operation_key="dlm:1_stop_0" on_node="virt-2" on_node_uuid="2"/>
+       </trigger>
+     </inputs>
+@@ -447,7 +445,7 @@
+   <synapse id="27">
+     <action_set>
+       <crm_event id="2" operation="stonith" operation_key="stonith-virt-1-on" on_node="virt-1" on_node_uuid="1">
+-        <attributes CRM_meta_on_node="virt-1" CRM_meta_on_node_uuid="1" CRM_meta_stonith_action="on" />
++        <attributes CRM_meta_node_unfenced="1234567" CRM_meta_on_node="virt-1" CRM_meta_on_node_uuid="1" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+     <inputs>
+diff --git a/pengine/test10/unfence-parameters.scores b/pengine/test10/unfence-parameters.scores
+index d9fa9bb..5089910 100644
+--- a/pengine/test10/unfence-parameters.scores
++++ b/pengine/test10/unfence-parameters.scores
+@@ -1,3 +1,7 @@
++  notice: Fencing   virt-4: node is unclean
++  notice: Unfencing virt-1: Device parameters changed (reload)
++  notice: Unfencing virt-2: Device parameters changed (reload)
++  notice: Unfencing virt-3: Device parameters changed (reload)
+ Allocation scores:
+ clone_color: clvmd-clone allocation score on virt-1: 0
+ clone_color: clvmd-clone allocation score on virt-2: 0
+diff --git a/pengine/test10/unfence-parameters.summary b/pengine/test10/unfence-parameters.summary
+index a713cd5..8effc63 100644
+--- a/pengine/test10/unfence-parameters.summary
++++ b/pengine/test10/unfence-parameters.summary
+@@ -11,6 +11,10 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Started: [ virt-1 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
++  notice: Unfencing virt-1: Device parameters changed (reload)
++  notice: Unfencing virt-2: Device parameters changed (reload)
++  notice: Unfencing virt-3: Device parameters changed (reload)
++  notice: Fencing   virt-4: node is unclean
+ Transition Summary:
+  * Fence (reboot) virt-4
+  * Fence (on) virt-3
+@@ -25,23 +29,23 @@ Transition Summary:
+  * Start   clvmd:2	(virt-3)
+ 
+ Executing cluster transition:
+- * Resource action: dlm             monitor on virt-3
+- * Resource action: clvmd           monitor on virt-2
+- * Resource action: clvmd           monitor on virt-3
++ * Resource action: fencing         monitor on virt-3
+  * Pseudo action:   clvmd-clone_stop_0
+  * Fencing virt-4 (reboot)
+  * Pseudo action:   stonith_complete
+  * Fencing virt-3 (on)
+- * Resource action: fencing         monitor on virt-3
++ * Resource action: fencing         stop on virt-1
++ * Resource action: dlm             monitor on virt-3
+  * Resource action: clvmd           stop on virt-1
++ * Resource action: clvmd           monitor on virt-3
+  * Pseudo action:   clvmd-clone_stopped_0
+- * Resource action: fencing         stop on virt-1
+  * Pseudo action:   dlm-clone_stop_0
+  * Resource action: dlm             stop on virt-2
+  * Fencing virt-2 (on)
+  * Resource action: dlm             stop on virt-1
+  * Pseudo action:   dlm-clone_stopped_0
+  * Pseudo action:   dlm-clone_start_0
++ * Resource action: clvmd           monitor on virt-2
+  * Fencing virt-1 (on)
+  * Pseudo action:   all_stopped
+  * Resource action: fencing         start on virt-1
+diff --git a/pengine/test10/unfence-parameters.xml b/pengine/test10/unfence-parameters.xml
+index f660100..26588bf 100644
+--- a/pengine/test10/unfence-parameters.xml
++++ b/pengine/test10/unfence-parameters.xml
+@@ -41,6 +41,11 @@
+   </configuration>
+   <status>
+     <node_state id="1" uname="virt-1" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-1">
++        <instance_attributes id="status-virt-1">
++          <nvpair id="status-virt-1" name="node_unfenced" value="1234567"/>
++        </instance_attributes>
++      </transient_attributes>
+       <lrm id="1">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_scsi" class="stonith">
+@@ -56,6 +61,11 @@
+       </lrm>
+     </node_state>
+     <node_state id="2" uname="virt-2" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-2">
++        <instance_attributes id="status-virt-2">
++          <nvpair id="status-virt-2" name="node_unfenced" value="1234567"/>
++	</instance_attributes>
++      </transient_attributes>
+       <lrm id="2">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_scsi" class="stonith">
+diff --git a/pengine/test10/unfence-startup.dot b/pengine/test10/unfence-startup.dot
+index 20f1367..d496956 100644
+--- a/pengine/test10/unfence-startup.dot
++++ b/pengine/test10/unfence-startup.dot
+@@ -11,7 +11,6 @@ digraph "g" {
+ "clvmd:1_start_0 virt-2" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "clvmd:1_start_0 virt-2" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_monitor_0 virt-3" -> "clvmd-clone_start_0" [ style = bold]
+-"clvmd:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "clvmd:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "clvmd:2_start_0 virt-3" -> "clvmd-clone_running_0" [ style = bold]
+ "clvmd:2_start_0 virt-3" [ style=bold color="green" fontcolor="black"]
+@@ -21,15 +20,15 @@ digraph "g" {
+ "dlm-clone_start_0" -> "dlm:2_start_0 virt-3" [ style = bold]
+ "dlm-clone_start_0" [ style=bold color="green" fontcolor="orange"]
+ "dlm:2_monitor_0 virt-3" -> "dlm-clone_start_0" [ style = bold]
+-"dlm:2_monitor_0 virt-3" -> "stonith 'on' virt-3" [ style = bold]
+ "dlm:2_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "dlm:2_start_0 virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
+ "dlm:2_start_0 virt-3" -> "dlm-clone_running_0" [ style = bold]
+ "dlm:2_start_0 virt-3" [ style=bold color="green" fontcolor="black"]
+ "fencing_monitor_0 virt-3" [ style=bold color="green" fontcolor="black"]
++"stonith 'on' virt-3" -> "clvmd:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "clvmd:2_start_0 virt-3" [ style = bold]
++"stonith 'on' virt-3" -> "dlm:2_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" -> "dlm:2_start_0 virt-3" [ style = bold]
+-"stonith 'on' virt-3" -> "fencing_monitor_0 virt-3" [ style = bold]
+ "stonith 'on' virt-3" [ style=bold color="green" fontcolor="black"]
+ "stonith 'reboot' virt-4" -> "stonith_complete" [ style = bold]
+ "stonith 'reboot' virt-4" [ style=bold color="green" fontcolor="black"]
+diff --git a/pengine/test10/unfence-startup.exp b/pengine/test10/unfence-startup.exp
+index a13ffca..70c1686 100644
+--- a/pengine/test10/unfence-startup.exp
++++ b/pengine/test10/unfence-startup.exp
+@@ -1,16 +1,12 @@
+ <transition_graph cluster-delay="60s" stonith-timeout="60s" failed-stop-offset="INFINITY" failed-start-offset="INFINITY"  transition_id="0">
+-  <synapse id="0" priority="1000000">
++  <synapse id="0">
+     <action_set>
+       <rsc_op id="7" operation="monitor" operation_key="fencing_monitor_0" on_node="virt-3" on_node_uuid="3">
+         <primitive id="fencing" class="stonith" type="fence_scsi"/>
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="1">
+     <action_set>
+@@ -38,7 +34,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="3" priority="1000000">
+     <action_set>
+@@ -124,7 +124,11 @@
+         <attributes CRM_meta_clone="2" CRM_meta_clone_max="4" CRM_meta_clone_node_max="1" CRM_meta_globally_unique="false" CRM_meta_notify="false" CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_op_target_rc="7" CRM_meta_timeout="20000" />
+       </rsc_op>
+     </action_set>
+-    <inputs/>
++    <inputs>
++      <trigger>
++        <crm_event id="4" operation="stonith" operation_key="stonith-virt-3-on" on_node="virt-3" on_node_uuid="3"/>
++      </trigger>
++    </inputs>
+   </synapse>
+   <synapse id="9" priority="1000000">
+     <action_set>
+@@ -191,14 +195,7 @@
+         <attributes CRM_meta_on_node="virt-3" CRM_meta_on_node_uuid="3" CRM_meta_stonith_action="on" />
+       </crm_event>
+     </action_set>
+-    <inputs>
+-      <trigger>
+-        <rsc_op id="8" operation="monitor" operation_key="dlm:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-      <trigger>
+-        <rsc_op id="9" operation="monitor" operation_key="clvmd:2_monitor_0" on_node="virt-3" on_node_uuid="3"/>
+-      </trigger>
+-    </inputs>
++    <inputs/>
+   </synapse>
+   <synapse id="14">
+     <action_set>
+diff --git a/pengine/test10/unfence-startup.scores b/pengine/test10/unfence-startup.scores
+index d9fa9bb..0172a9d 100644
+--- a/pengine/test10/unfence-startup.scores
++++ b/pengine/test10/unfence-startup.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   virt-4: node is unclean
++  notice: Unfencing virt-3: Required by dlm:2
+ Allocation scores:
+ clone_color: clvmd-clone allocation score on virt-1: 0
+ clone_color: clvmd-clone allocation score on virt-2: 0
+diff --git a/pengine/test10/unfence-startup.summary b/pengine/test10/unfence-startup.summary
+index c3f1be4..6a49f42 100644
+--- a/pengine/test10/unfence-startup.summary
++++ b/pengine/test10/unfence-startup.summary
+@@ -11,6 +11,8 @@ Online: [ virt-1 virt-2 virt-3 ]
+      Started: [ virt-1 ]
+      Stopped: [ virt-2 virt-3 virt-4 ]
+ 
++  notice: Unfencing virt-3: Required by dlm:2
++  notice: Fencing   virt-4: node is unclean
+ Transition Summary:
+  * Fence (reboot) virt-4
+  * Fence (on) virt-3
+@@ -19,15 +21,15 @@ Transition Summary:
+  * Start   clvmd:2	(virt-3)
+ 
+ Executing cluster transition:
+- * Resource action: dlm             monitor on virt-3
+- * Pseudo action:   dlm-clone_start_0
++ * Resource action: fencing         monitor on virt-3
+  * Resource action: clvmd           monitor on virt-2
+- * Resource action: clvmd           monitor on virt-3
+  * Fencing virt-4 (reboot)
+  * Pseudo action:   stonith_complete
+  * Fencing virt-3 (on)
+  * Pseudo action:   all_stopped
+- * Resource action: fencing         monitor on virt-3
++ * Resource action: dlm             monitor on virt-3
++ * Pseudo action:   dlm-clone_start_0
++ * Resource action: clvmd           monitor on virt-3
+  * Resource action: dlm             start on virt-3
+  * Pseudo action:   dlm-clone_running_0
+  * Pseudo action:   clvmd-clone_start_0
+diff --git a/pengine/test10/unfence-startup.xml b/pengine/test10/unfence-startup.xml
+index 83e9ffe..28637e3 100644
+--- a/pengine/test10/unfence-startup.xml
++++ b/pengine/test10/unfence-startup.xml
+@@ -41,6 +41,11 @@
+   </configuration>
+   <status>
+     <node_state id="1" uname="virt-1" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-1">
++        <instance_attributes id="status-virt-1">
++          <nvpair id="status-virt-1" name="node_unfenced" value="1234567"/>
++        </instance_attributes>
++      </transient_attributes>
+       <lrm id="1">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_scsi" class="stonith">
+@@ -56,6 +61,11 @@
+       </lrm>
+     </node_state>
+     <node_state id="2" uname="virt-2" in_ccm="true" crmd="online" crm-debug-origin="do_state_transition" join="member" expected="member">
++      <transient_attributes id="virt-2">
++        <instance_attributes id="status-virt-2">
++          <nvpair id="status-virt-2" name="node_unfenced" value="1234567"/>
++        </instance_attributes>
++      </transient_attributes>
+       <lrm id="2">
+         <lrm_resources>
+           <lrm_resource id="fencing" type="fence_scsi" class="stonith">
+diff --git a/pengine/test10/whitebox-fail1.scores b/pengine/test10/whitebox-fail1.scores
+index 4fbbf29..02192a9 100644
+--- a/pengine/test10/whitebox-fail1.scores
++++ b/pengine/test10/whitebox-fail1.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   lxc1: guest is unclean
+ Allocation scores:
+ clone_color: M-clone allocation score on 18node1: 0
+ clone_color: M-clone allocation score on 18node2: 0
+diff --git a/pengine/test10/whitebox-fail1.summary b/pengine/test10/whitebox-fail1.summary
+index 57d72ba..c7b5e19 100644
+--- a/pengine/test10/whitebox-fail1.summary
++++ b/pengine/test10/whitebox-fail1.summary
+@@ -13,6 +13,7 @@ Containers: [ lxc2:container2 ]
+  C	(ocf::pacemaker:Dummy):	Started lxc2
+  D	(ocf::pacemaker:Dummy):	Started 18node1
+ 
++  notice: Fencing   lxc1: guest is unclean
+ Transition Summary:
+  * Fence (reboot) lxc1 (resource: container1)
+  * Recover container1	(Started 18node2)
+diff --git a/pengine/test10/whitebox-fail2.scores b/pengine/test10/whitebox-fail2.scores
+index 4fbbf29..02192a9 100644
+--- a/pengine/test10/whitebox-fail2.scores
++++ b/pengine/test10/whitebox-fail2.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   lxc1: guest is unclean
+ Allocation scores:
+ clone_color: M-clone allocation score on 18node1: 0
+ clone_color: M-clone allocation score on 18node2: 0
+diff --git a/pengine/test10/whitebox-fail2.summary b/pengine/test10/whitebox-fail2.summary
+index bf12683..73e968e 100644
+--- a/pengine/test10/whitebox-fail2.summary
++++ b/pengine/test10/whitebox-fail2.summary
+@@ -13,6 +13,7 @@ Containers: [ lxc2:container2 ]
+  C	(ocf::pacemaker:Dummy):	Started lxc2
+  D	(ocf::pacemaker:Dummy):	Started 18node1
+ 
++  notice: Fencing   lxc1: guest is unclean
+ Transition Summary:
+  * Fence (reboot) lxc1 (resource: container1)
+  * Recover container1	(Started 18node2)
+diff --git a/pengine/test10/whitebox-imply-stop-on-fence.scores b/pengine/test10/whitebox-imply-stop-on-fence.scores
+index e50f077..5c3e325 100644
+--- a/pengine/test10/whitebox-imply-stop-on-fence.scores
++++ b/pengine/test10/whitebox-imply-stop-on-fence.scores
+@@ -1,3 +1,6 @@
++  notice: Fencing   kiff-01: node is unclean
++  notice: Fencing   lxc-01_kiff-01: guest is unclean
++  notice: Fencing   lxc-02_kiff-01: guest is unclean
+ Allocation scores:
+ clone_color: clvmd-clone allocation score on kiff-01: 0
+ clone_color: clvmd-clone allocation score on kiff-02: 0
+diff --git a/pengine/test10/whitebox-imply-stop-on-fence.summary b/pengine/test10/whitebox-imply-stop-on-fence.summary
+index 2fb20a6..a74bb72 100644
+--- a/pengine/test10/whitebox-imply-stop-on-fence.summary
++++ b/pengine/test10/whitebox-imply-stop-on-fence.summary
+@@ -24,6 +24,9 @@ Containers: [ lxc-01_kiff-02:R-lxc-01_kiff-02 lxc-02_kiff-02:R-lxc-02_kiff-02 ]
+  R-lxc-02_kiff-02	(ocf::heartbeat:VirtualDomain):	Started kiff-02 
+  vm-fs	(ocf::heartbeat:Filesystem):	FAILED lxc-01_kiff-01
+ 
++  notice: Fencing   kiff-01: node is unclean
++  notice: Fencing   lxc-01_kiff-01: guest is unclean
++  notice: Fencing   lxc-02_kiff-01: guest is unclean
+ Transition Summary:
+  * Fence (reboot) lxc-02_kiff-01 (resource: R-lxc-02_kiff-01)
+  * Fence (reboot) lxc-01_kiff-01 (resource: R-lxc-01_kiff-01)
+diff --git a/pengine/test10/whitebox-ms-ordering.scores b/pengine/test10/whitebox-ms-ordering.scores
+index f0e51f5..72e6d25 100644
+--- a/pengine/test10/whitebox-ms-ordering.scores
++++ b/pengine/test10/whitebox-ms-ordering.scores
+@@ -1,3 +1,5 @@
++  notice: Fencing   lxc1: guest is unclean
++  notice: Fencing   lxc2: guest is unclean
+ Allocation scores:
+ clone_color: lxc-ms-master allocation score on 18node1: 0
+ clone_color: lxc-ms-master allocation score on 18node2: 0
+diff --git a/pengine/test10/whitebox-ms-ordering.summary b/pengine/test10/whitebox-ms-ordering.summary
+index 2230d0f..41436f8 100644
+--- a/pengine/test10/whitebox-ms-ordering.summary
++++ b/pengine/test10/whitebox-ms-ordering.summary
+@@ -8,6 +8,8 @@ Online: [ 18node1 18node2 18node3 ]
+  Master/Slave Set: lxc-ms-master [lxc-ms]
+      Stopped: [ 18node1 18node2 18node3 ]
+ 
++  notice: Fencing   lxc1: guest is unclean
++  notice: Fencing   lxc2: guest is unclean
+ Transition Summary:
+  * Fence (reboot) lxc2 (resource: container2)
+  * Fence (reboot) lxc1 (resource: container1)
+diff --git a/pengine/test10/whitebox-unexpectedly-running.scores b/pengine/test10/whitebox-unexpectedly-running.scores
+index 7f8a1d9..eb8a6f9 100644
+--- a/pengine/test10/whitebox-unexpectedly-running.scores
++++ b/pengine/test10/whitebox-unexpectedly-running.scores
+@@ -1,3 +1,4 @@
++  notice: Fencing   remote1: guest is unclean
+ Allocation scores:
+ native_color: FAKE allocation score on 18builder: 0
+ native_color: FAKE allocation score on remote1: -INFINITY
+diff --git a/pengine/test10/whitebox-unexpectedly-running.summary b/pengine/test10/whitebox-unexpectedly-running.summary
+index eabeb4d..3888aa2 100644
+--- a/pengine/test10/whitebox-unexpectedly-running.summary
++++ b/pengine/test10/whitebox-unexpectedly-running.summary
+@@ -4,6 +4,7 @@ Online: [ 18builder ]
+ 
+  FAKE	(ocf::pacemaker:Dummy):	FAILED 18builder 
+ 
++  notice: Fencing   remote1: guest is unclean
+ Transition Summary:
+  * Fence (reboot) remote1 (resource: FAKE)
+  * Recover FAKE	(Started 18builder)
+-- 
+2.5.5
+

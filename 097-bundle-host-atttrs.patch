@@ -1,0 +1,213 @@
+From a248fad1887faf13a9b90708fb01bcb33b78a3a0 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Mon, 28 Aug 2017 12:17:16 +1000
+Subject: [PATCH] Tools: Allow bundle resources to read/write master scores
+ based on the same logic as attrd (cf34f4c)
+
+---
+ include/crm/attrd.h   |  2 ++
+ lib/common/utils.c    | 28 +++++++++++++++++++++++++++-
+ tools/Makefile.am     |  2 +-
+ tools/attrd_updater.c | 40 +++++++++-------------------------------
+ tools/crm_attribute.c | 14 ++++++--------
+ tools/crm_master      |  6 ++----
+ 6 files changed, 47 insertions(+), 45 deletions(-)
+
+diff --git a/include/crm/attrd.h b/include/crm/attrd.h
+index cc4c92d..3d2284c 100644
+--- a/include/crm/attrd.h
++++ b/include/crm/attrd.h
+@@ -24,6 +24,8 @@
+ #define attrd_opt_remote  0x001
+ #define attrd_opt_private 0x002
+ 
++const char *attrd_get_target(const char *name);
++
+ int attrd_update_delegate(crm_ipc_t * ipc, char command, const char *host,
+                           const char *name, const char *value, const char *section,
+                           const char *set, const char *dampen, const char *user_name, int options);
+diff --git a/lib/common/utils.c b/lib/common/utils.c
+index 399171d..2930081 100644
+--- a/lib/common/utils.c
++++ b/lib/common/utils.c
+@@ -1678,7 +1678,33 @@ done:
+     return rc;
+ }
+ 
+-#define FAKE_TE_ID	"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
++const char *
++attrd_get_target(const char *name)
++{
++    if(safe_str_eq(name, "auto") || safe_str_eq(name, "localhost")) {
++        name = NULL;
++    }
++
++    if(name != NULL) {
++        return name;
++
++    } else {
++        const char *target = getenv(crm_meta_name(XML_RSC_ATTR_TARGET));
++        const char *host_pyhsical = getenv(crm_meta_name(PCMK_ENV_PHYSICAL_HOST));
++        const char *host_pcmk = getenv("OCF_RESKEY_" CRM_META "_" XML_LRM_ATTR_TARGET);
++
++        /* It is important we use the names by which the PE knows us */
++        if(safe_str_eq(target, "host") && host_pyhsical != NULL) {
++            return host_pyhsical;
++        } else if(host_pcmk) {
++            return host_pcmk;
++        }
++    }
++
++    return name;
++}
++
++#define FAKE_TE_ID     "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+ static void
+ append_digest(lrmd_event_data_t * op, xmlNode * update, const char *version, const char *magic,
+               int level)
+diff --git a/tools/Makefile.am b/tools/Makefile.am
+index b0a2aff..2de9ce8 100644
+--- a/tools/Makefile.am
++++ b/tools/Makefile.am
+@@ -119,7 +119,7 @@ iso8601_SOURCES		= test.iso8601.c
+ iso8601_LDADD		= $(COMMONLIBS)
+ 
+ attrd_updater_SOURCES	= attrd_updater.c
+-attrd_updater_LDADD	= $(COMMONLIBS)
++attrd_updater_LDADD	= $(top_builddir)/lib/cluster/libcrmcluster.la $(COMMONLIBS)
+ 
+ crm_ticket_SOURCES	= crm_ticket.c
+ crm_ticket_LDADD	= $(top_builddir)/lib/pengine/libpe_rules.la  \
+diff --git a/tools/attrd_updater.c b/tools/attrd_updater.c
+index 68cac02..a75adc2 100644
+--- a/tools/attrd_updater.c
++++ b/tools/attrd_updater.c
+@@ -32,6 +32,7 @@
+ #include <crm/common/ipc.h>
+ 
+ #include <crm/attrd.h>
++#include <crm/cluster.h>
+ 
+ /* *INDENT-OFF* */
+ static struct crm_option long_options[] = {
+@@ -79,7 +80,6 @@ static int do_query(const char *attr_name, const char *attr_node, gboolean query
+ static int do_update(char command, const char *attr_node, const char *attr_name,
+                      const char *attr_value, const char *attr_section,
+                      const char *attr_set, const char *attr_dampen, int attr_options);
+-static const char *get_hostname(const char *name);
+ 
+ int
+ main(int argc, char **argv)
+@@ -187,7 +187,10 @@ main(int argc, char **argv)
+         crm_help('?', EX_USAGE);
+ #endif
+     } else {
+-        attr_node = get_hostname(attr_node);
++        attr_node = attrd_get_target(attr_node);
++        if (attr_node == NULL) {
++            attr_node = get_local_node_name();
++        }
+         crm_exit(do_update(command, attr_node, attr_name, attr_value,
+                            attr_section, attr_set, attr_dampen, attr_options));
+     }
+@@ -336,11 +339,11 @@ do_query(const char *attr_name, const char *attr_node, gboolean query_all)
+     /* Decide which node(s) to query */
+     if (query_all == TRUE) {
+         attr_node = NULL;
+-    } else if (attr_node == NULL) {
+-        crm_debug("User did not specify node for query, using localhost");
+-        attr_node = get_hostname(attr_node);
+     } else {
+-        attr_node = get_hostname(attr_node);
++        attr_node = attrd_get_target(attr_node);
++        if (attr_node == NULL) {
++            attr_node = get_local_node_name();
++        }
+     }
+ 
+     /* Build and send attrd request, and get XML reply */
+@@ -386,28 +389,3 @@ do_update(char command, const char *attr_node, const char *attr_name,
+     }
+     return rc;
+ }
+-
+-static const char *
+-get_hostname(const char *name)
+-{
+-    if(name != NULL
+-       && safe_str_neq(name, "auto")
+-       && safe_str_neq(name, "localhost")) {
+-        return name;
+-
+-    } else {
+-        const char *target = getenv(crm_meta_name(XML_RSC_ATTR_TARGET));
+-        const char *host_pyhsical = getenv(crm_meta_name(PCMK_ENV_PHYSICAL_HOST));
+-        const char *host_pcmk = getenv("OCF_RESKEY_" CRM_META "_" XML_LRM_ATTR_TARGET);
+-
+-        /* It is important we use the names by which the PE knows us */
+-        if(safe_str_eq(target, "host") && host_pyhsical != NULL) {
+-            return host_pyhsical;
+-
+-        } else if(host_pcmk) {
+-            return host_pcmk;
+-        }
+-    }
+-
+-    return name;
+-}
+diff --git a/tools/crm_attribute.c b/tools/crm_attribute.c
+index a77f93c..935fa96 100644
+--- a/tools/crm_attribute.c
++++ b/tools/crm_attribute.c
+@@ -241,15 +241,13 @@ main(int argc, char **argv)
+ 
+     } else if (safe_str_eq(type, XML_CIB_TAG_CRMCONFIG)) {
+     } else if (safe_str_neq(type, XML_CIB_TAG_TICKETS)) {
++        /* If we are being called from a resource agent via the cluster,
++         * the correct local node name will be passed as an environment
++         * variable. Otherwise, we have to ask the cluster.
++         */
++        dest_uname = attrd_get_target(dest_uname);
+         if (dest_uname == NULL) {
+-            /* If we are being called from a resource agent via the cluster,
+-             * the correct local node name will be passed as an environment
+-             * variable. Otherwise, we have to ask the cluster.
+-             */
+-            dest_uname = getenv("OCF_RESKEY_" CRM_META "_" XML_LRM_ATTR_TARGET);
+-            if (dest_uname == NULL) {
+-                dest_uname = get_local_node_name();
+-            }
++            dest_uname = get_local_node_name();
+         }
+ 
+         rc = query_node_uuid(the_cib, dest_uname, &dest_node, &is_remote_node);
+diff --git a/tools/crm_master b/tools/crm_master
+index 7cce64d..7e31cea 100755
+--- a/tools/crm_master
++++ b/tools/crm_master
+@@ -1,7 +1,5 @@
+ #!/bin/bash
+ 
+-target=`crm_node -n`
+-
+ TEMP=`getopt -o qDGQVN:U:v:i:l:r: --long version,help,resource:,node:,uname:,attr-value:,id:,update:,delete-attr,get-value,attr-id:,lifetime:,quiet \
+      -n 'crm_master' -- "$@"`
+ 
+@@ -12,7 +10,7 @@ eval set -- "$TEMP"
+ 
+ while true ; do
+ 	case "$1" in
+-	    -N|--node|-U|--uname) target="$2"; shift; shift;;
++	    -N|--node|-U|--uname) options="$options $1 $2"; shift; shift;;
+ 	    -v|--attr-value|--update|-i|--id|--attr-id|-l|--lifetime) options="$options $1 $2"; shift; shift;;
+ 	    -Q|-q|--quiet|-D|--delete-attr|-G|--get-value|-V) options="$options $1"; shift;;
+ 	    -r|--resource) OCF_RESOURCE_INSTANCE=$2; shift; shift;;
+@@ -53,4 +51,4 @@ if [ -z "$OCF_RESOURCE_INSTANCE" ]; then
+     exit 1
+ fi
+ 
+-crm_attribute -N $target -n master-$OCF_RESOURCE_INSTANCE $options
++crm_attribute -n master-$OCF_RESOURCE_INSTANCE $options
+-- 
+2.5.5
+

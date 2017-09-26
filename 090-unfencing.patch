@@ -1,0 +1,26 @@
+From 1026fc8da901b64721894a7f6f6c466031741d4a Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Mon, 14 Aug 2017 12:35:16 +1000
+Subject: [PATCH 1/2] PE: Unfencing: Correctly detect changes to device
+ definitions
+
+---
+ lib/pengine/utils.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/pengine/utils.c b/lib/pengine/utils.c
+index 222a3e2..d4943a7 100644
+--- a/lib/pengine/utils.c
++++ b/lib/pengine/utils.c
+@@ -2107,7 +2107,7 @@ fencing_action_digest_cmp(resource_t * rsc, node_t * node, pe_working_set_t * da
+      * We use the resource id + agent + digest so that we can detect
+      * changes to the agent and/or the parameters used
+      */
+-    char *search_all = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
++    char *search_all = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_all_calc);
+     char *search_secure = crm_strdup_printf("%s:%s:%s", rsc->id, (const char*)g_hash_table_lookup(rsc->meta, XML_ATTR_TYPE), data->digest_secure_calc);
+  
+     data->rc = RSC_DIGEST_ALL;
+-- 
+2.5.5
+

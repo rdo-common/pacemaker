@@ -1,0 +1,31 @@
+From 50e264254fcdf90f5ad0ce429938c15495f99acb Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Thu, 24 Aug 2017 14:34:46 +1000
+Subject: [PATCH 1/2] Fix: attrd: Allow values for all nodes to be queried
+
+---
+ tools/attrd_updater.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tools/attrd_updater.c b/tools/attrd_updater.c
+index 33d751b..de75496 100644
+--- a/tools/attrd_updater.c
++++ b/tools/attrd_updater.c
+@@ -351,11 +351,11 @@ do_query(const char *attr_name, const char *attr_node, gboolean query_all)
+         attr_node = NULL;
+     } else if (attr_node == NULL) {
+         crm_debug("User did not specify node for query, using localhost");
+-        attr_node = "localhost";
++        attr_node = get_hostname(attr_node);
++    } else {
++        attr_node = get_hostname(attr_node);
+     }
+ 
+-    attr_node = get_hostname(attr_node);
+-
+     /* Build and send attrd request, and get XML reply */
+     rc = send_attrd_query(attr_name, attr_node, &reply);
+     if (rc != pcmk_ok) {
+-- 
+2.5.5
+
