@@ -1,0 +1,30 @@
+From 817ba774a46b9504b12ccd7cf6e7d17a8e53d59d Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Mon, 14 Aug 2017 12:51:25 +1000
+Subject: [PATCH 2/2] Fix: crmd: Correctly record that unfencing is complete
+
+---
+ crmd/te_callbacks.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/crmd/te_callbacks.c b/crmd/te_callbacks.c
+index b5c857d..4476d4a 100644
+--- a/crmd/te_callbacks.c
++++ b/crmd/te_callbacks.c
+@@ -799,10 +799,11 @@ tengine_stonith_callback(stonith_t * stonith, stonith_callback_data_t * data)
+             if (safe_str_eq("on", op)) {
+                 const char *key = NULL;
+                 const char *value = NULL;
++                char *now = crm_itoa(time(NULL));
+ 
+                 key = XML_NODE_IS_UNFENCED;
+-                value = crm_meta_value(action->params, key);
+-                update_attrd(target, key, value, NULL, FALSE);
++                update_attrd(target, key, now, NULL, FALSE);
++                free(now);
+ 
+                 key = "digests-all";
+                 value = crm_meta_value(action->params, key);
+-- 
+2.5.5
+

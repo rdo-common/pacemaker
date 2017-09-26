@@ -1,0 +1,33 @@
+From e3485d6fd5e9e6ec05d9cd6682d46da3e463d6c7 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Wed, 13 Sep 2017 13:31:09 +1000
+Subject: [PATCH 1/2] Fix: PE: Prevent graph loops when fencing the host out
+ from underneath a bundle
+
+---
+ pengine/allocate.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/pengine/allocate.c b/pengine/allocate.c
+index 958fb2320ebd..d610035b074c 100644
+--- a/pengine/allocate.c
++++ b/pengine/allocate.c
+@@ -1416,7 +1416,14 @@ fence_guest(pe_node_t *node, pe_action_t *done, pe_working_set_t *data_set)
+      * it is restarted, so we always order pseudo-fencing after stop, not start
+      * (even though start might be closer to what is done for a real reboot).
+      */
+-    if (stop) {
++    if(stop && is_set(stop->flags, pe_action_pseudo)) {
++        pe_action_t *parent_stonith_op = pe_fence_op(stop->node, NULL, FALSE, NULL, data_set);
++        crm_info("Implying guest node %s is down (action %d) after %s fencing",
++                 node->details->uname, stonith_op->id, stop->node->details->uname);
++        order_actions(parent_stonith_op, stonith_op,
++                      pe_order_runnable_left|pe_order_implies_then);
++
++    } else if (stop) {
+         order_actions(stop, stonith_op,
+                       pe_order_runnable_left|pe_order_implies_then);
+         crm_info("Implying guest node %s is down (action %d) "
+-- 
+2.13.5
+

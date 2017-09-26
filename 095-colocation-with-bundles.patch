@@ -1,0 +1,28 @@
+From 67ebfc43eabf77e72d784084e23d3031bfc19710 Mon Sep 17 00:00:00 2001
+From: Andrew Beekhof <andrew@beekhof.net>
+Date: Thu, 24 Aug 2017 14:35:29 +1000
+Subject: [PATCH 2/2] Fix: PE: Correctly interpret colocation with bundles
+
+---
+ pengine/graph.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/pengine/graph.c b/pengine/graph.c
+index 3c5dc6b..990d8b8 100644
+--- a/pengine/graph.c
++++ b/pengine/graph.c
+@@ -445,6 +447,11 @@ update_colo_start_chain(action_t *action)
+         return;
+     }
+ 
++    if(rsc->parent) {
++        /* uber_parent() stops _before_ the bundle */
++        rsc = rsc->parent;
++    }
++
+     /* if rsc has children, all the children need to have start set to
+      * unrunnable before we follow the colo chain for the parent. */
+     for (gIter = rsc->children; gIter != NULL; gIter = gIter->next) {
+-- 
+2.5.5
+
